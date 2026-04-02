@@ -65,11 +65,16 @@ export default function WorklogAnalyzer() {
       .catch(e => console.error("사용자 조회 실패:", e));
   }, []);
 
-  // ── 자동 JQL 생성 ─────────────────────────────────────────────
+  // ── 자동 JQL 생성 (미리보기 표시용) ─────────────────────────
+  // ※ 실제 실행 JQL도 백엔드에서 동일하게 worklogDate < endDate+1일 방식 사용
   useEffect(() => {
     if (isManualJql) return;
 
-    let jql = `worklogDate >= "${startDate}" AND worklogDate <= "${endDate}" AND worklogAuthor = currentUser()`;
+    const endDateObj  = new Date(endDate);
+    endDateObj.setDate(endDateObj.getDate() + 1);
+    const endDateNext = endDateObj.toISOString().split("T")[0];
+
+    let jql = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}" AND worklogAuthor = currentUser()`;
 
     if (targetMode !== "me" && selectedUsers.length > 0) {
       const accounts = [...new Set(
@@ -77,7 +82,7 @@ export default function WorklogAnalyzer() {
       )];
       if (accounts.length > 0) {
         const list = accounts.map(a => `"${a}"`).join(", ");
-        jql = `worklogDate >= "${startDate}" AND worklogDate <= "${endDate}" AND worklogAuthor in (${list})`;
+        jql = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}" AND worklogAuthor in (${list})`;
       }
     }
     setJqlValue(jql);
@@ -107,12 +112,11 @@ export default function WorklogAnalyzer() {
     );
   };
 
-  // ── 시작일 변경 → 종료일 자동 +1일 ───────────────────────────
+  // ── 시작일 변경 → endDate가 더 빠르면 startDate와 동일하게 조정 ──
+  // ※ endDate +1일 처리는 백엔드(route.js)에서 자동 수행
   const handleStartDateChange = (val) => {
     setStartDate(val);
-    const d = new Date(val);
-    d.setDate(d.getDate() + 1);
-    setEndDate(d.toISOString().split("T")[0]);
+    if (endDate < val) setEndDate(val);
   };
 
   // ── 진행바 시작/정리 ──────────────────────────────────────────
@@ -212,8 +216,12 @@ export default function WorklogAnalyzer() {
       xlsx.utils.book_append_sheet(wb, ws1, "1. 작업 내역 상세");
 
       // 시트2: 월별
-      const ws2 = xlsx.utils.json_to_sheet(statsByMonth.map(s => ({ "연월": s.label, "총 시간(H)": parseFloat(s.value) })));
-      ws2["!cols"] = [{ wch: 15 }, { wch: 15 }];
+      const ws2 = xlsx.utils.json_to_sheet(statsByMonth.map(s => ({ 
+        "연월": s.label, 
+        "MM": parseFloat(s.value),
+        "총 시간(H)": parseFloat(s.hours)
+      })));
+      ws2["!cols"] = [{ wch: 15 }, { wch: 12 }, { wch: 15 }];
       xlsx.utils.book_append_sheet(wb, ws2, "2. 월별 통계");
 
       // 시트3: 작업자별
@@ -237,14 +245,40 @@ export default function WorklogAnalyzer() {
       const m = w.started.substring(0, 7);
       map[m] = (map[m] || 0) + (w.timeSpentSeconds || 0);
     });
-    return Object.entries(map).sort().map(([k, v]) => ({ label: k, value: (v / 3600).toFixed(1) }));
+    return Object.entries(map).sort().map(([k, v]) => {
+      const hours = v / 3600;
+      const mm = hours / 8 / 20.5;
+      return { 
+        label: k, 
+        value: mm.toFixed(3), // MM은 정밀도를 위해 소수점 3자리
+        hours: hours.toFixed(1)
+      };
+    });
   }, [worklogs]);
 
   const statsByUser = useMemo(() => {
     const map = {};
     worklogs.forEach(w => { map[w.author] = (map[w.author] || 0) + (w.timeSpentSeconds || 0); });
+
+    // 선택된 사용자 중 워크로그가 없는 사람도 0h로 포함
+    // ※ Jira displayName("장성민")과 DB name("장성민 기타협력사")처럼
+    //   이름이 포함 관계인 경우 같은 사람으로 인식해 중복 추가 방지
+    if (targetMode !== "me") {
+      const worklogAuthors = Object.keys(map);
+      dbUsers
+        .filter(u => selectedUsers.includes(u.id))
+        .forEach(u => {
+          const hasWorklog = worklogAuthors.some(author =>
+            author === u.name ||           // 정확히 일치
+            author.startsWith(u.name) ||   // Jira명이 DB명으로 시작 ("장성민 (회사)" vs "장성민")
+            u.name.startsWith(author)      // DB명이 Jira명으로 시작  ("장성민 기타협력사" vs "장성민")
+          );
+          if (!hasWorklog) map[u.name] = 0;
+        });
+    }
+
     return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: (v / 3600).toFixed(1) }));
-  }, [worklogs]);
+  }, [worklogs, targetMode, selectedUsers, dbUsers]);
 
   const filteredWorklogs = useMemo(() =>
     filterAuthor ? worklogs.filter(w => w.author === filterAuthor) : worklogs,
@@ -453,43 +487,232 @@ export default function WorklogAnalyzer() {
           </div>
           {showCharts && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
+
+              {/* ── 월별 실적: 세로 막대 + 추이선 ── */}
               <div>
-                <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "1rem" }}>월별 실적</h3>
-                {statsByMonth.map(s => {
-                  const pct = (parseFloat(s.value) / Math.max(...statsByMonth.map(x => parseFloat(x.value)))) * 100;
+                <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "1rem" }}>📅 월별 실적</h3>
+                {(() => {
+                  const BAR_W = 44;
+                  const GAP   = 16;
+                  const H     = 200;
+                  const PAD_L = 44;
+                  const PAD_B = 36;
+                  const PAD_T = 20;
+                  const n     = statsByMonth.length;
+                  const W     = PAD_L + n * BAR_W + (n - 1) * GAP + 24;
+                  const maxVal = Math.max(...statsByMonth.map(x => parseFloat(x.value)), 1);
+                  // 눈금선 개수
+                  const gridLines = 4;
+
+                  // 각 막대 x 중심
+                  const barCx = (i) => PAD_L + i * (BAR_W + GAP) + BAR_W / 2;
+                  const barH  = (v) => ((v / maxVal) * (H - PAD_T - PAD_B));
+                  const barY  = (v) => H - PAD_B - barH(v);
+
+                  // 추이선 포인트
+                  const points = statsByMonth.map((s, i) =>
+                    `${barCx(i)},${barY(parseFloat(s.value))}`
+                  ).join(" ");
+
                   return (
-                    <div key={s.label} style={{ marginBottom: "0.6rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "2px" }}>
-                        <span>{s.label}</span><span style={{ color: "#60a5fa" }}>{s.value}h</span>
-                      </div>
-                      <div style={{ height: "5px", background: "#1a1a2e", borderRadius: "3px" }}>
-                        <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent-color)", borderRadius: "3px", transition: "width 0.6s" }} />
-                      </div>
+                    <div style={{ width: "100%" }}>
+                      <svg viewBox={`0 0 ${Math.max(W, 280)} ${H}`} width="100%" height={H} style={{ display: "block" }}>
+                        {/* 눈금선 */}
+                        {Array.from({ length: gridLines + 1 }, (_, gi) => {
+                          const yVal = (maxVal / gridLines) * gi;
+                          const yPos = H - PAD_B - (yVal / maxVal) * (H - PAD_T - PAD_B);
+                          return (
+                            <g key={gi}>
+                              <line x1={PAD_L - 6} y1={yPos} x2={W} y2={yPos}
+                                stroke="#1e1e2e" strokeWidth="1" />
+                              <text x={PAD_L - 8} y={yPos + 4} textAnchor="end"
+                                fontSize="10" fill="#555">
+                                {yVal.toFixed(2)}
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* Y축 라벨 */}
+                        <text x={8} y={H / 2} textAnchor="middle" fontSize="10" fill="#555"
+                          transform={`rotate(-90,8,${H / 2})`}>MM</text>
+
+                        {/* 막대 */}
+                        {statsByMonth.map((s, i) => {
+                          const val  = parseFloat(s.value);
+                          const bh   = barH(val);
+                          const bx   = PAD_L + i * (BAR_W + GAP);
+                          const by   = barY(val);
+                          return (
+                            <g key={s.label}>
+                              {/* 막대 그라데이션 */}
+                              <defs>
+                                <linearGradient id={`mg${i}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.9" />
+                                  <stop offset="100%" stopColor="#1d4ed8" stopOpacity="0.7" />
+                                </linearGradient>
+                              </defs>
+                              <rect x={bx} y={by} width={BAR_W} height={bh}
+                                fill={`url(#mg${i})`} rx="4" ry="4">
+                                <title>{s.label}: {val} MM ({s.hours}h)</title>
+                              </rect>
+                              {/* 막대 위 수치 */}
+                              <text x={bx + BAR_W / 2} y={by - 4} textAnchor="middle"
+                                fontSize="10" fill="#60a5fa" fontWeight="bold">
+                                {val} MM
+                              </text>
+                              {/* X축 레이블 */}
+                              <text x={bx + BAR_W / 2} y={H - PAD_B + 14} textAnchor="middle"
+                                fontSize="10" fill="#888">
+                                {s.label.substring(5)}월
+                              </text>
+                              <text x={bx + BAR_W / 2} y={H - PAD_B + 26} textAnchor="middle"
+                                fontSize="9" fill="#555">
+                                {s.label.substring(0, 4)}
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* 추이선 */}
+                        {n >= 2 && (
+                          <>
+                            <defs>
+                              <filter id="glow">
+                                <feGaussianBlur stdDeviation="2" result="blur" />
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                              </filter>
+                            </defs>
+                            <polyline
+                              points={points}
+                              fill="none"
+                              stroke="rgba(16,185,129,0.35)"
+                              strokeWidth="2"
+                              strokeDasharray="4 3"
+                            />
+                            <polyline
+                              points={points}
+                              fill="none"
+                              stroke="#10b981"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              filter="url(#glow)"
+                            />
+                            {statsByMonth.map((s, i) => (
+                              <circle key={s.label}
+                                cx={barCx(i)} cy={barY(parseFloat(s.value))} r="4"
+                                fill="#10b981" stroke="#0a0a12" strokeWidth="2" />
+                            ))}
+                          </>
+                        )}
+                      </svg>
                     </div>
                   );
-                })}
+                })()}
               </div>
+
+              {/* ── 작업자별 실적: 카드 그리드 ── */}
               <div>
-                <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "1rem" }}>작업자별 실적</h3>
-                <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-                  {statsByUser.map(s => {
-                    const active = filterAuthor === s.label;
-                    const pct = (parseFloat(s.value) / Math.max(...statsByUser.map(x => parseFloat(x.value)))) * 100;
-                    return (
-                      <div key={s.label}
-                        onClick={() => setFilterAuthor(active ? null : s.label)}
-                        style={{ marginBottom: "0.6rem", cursor: "pointer", padding: "4px 8px", borderRadius: "6px", background: active ? "rgba(59,130,246,0.12)" : "transparent", border: `1px solid ${active ? "var(--accent-color)" : "transparent"}` }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "2px" }}>
-                          <span>{active ? "✅ " : ""}{s.label}</span><span style={{ color: "#10b981" }}>{s.value}h</span>
-                        </div>
-                        <div style={{ height: "5px", background: "#1a1a2e", borderRadius: "3px" }}>
-                          <div style={{ width: `${pct}%`, height: "100%", background: "#10b981", borderRadius: "3px" }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "0.75rem" }}>
+                  👤 작업자별 실적
+                  <span style={{ marginLeft: "0.75rem", fontSize: "0.75rem", color: "#555" }}>
+                    (<span style={{ color: "#f97316" }}>●</span> 8h 미만)
+                  </span>
+                </h3>
+                {(() => {
+                  const maxVal = Math.max(...statsByUser.map(x => parseFloat(x.value)), 1);
+                  const THRESHOLD = 8; // 8시간 기준
+                  return (
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                      gap: "0.6rem",
+                    }}>
+                      {statsByUser.map(s => {
+                        const val    = parseFloat(s.value);
+                        const active = filterAuthor === s.label;
+                        const under  = val < THRESHOLD;
+                        const pct    = (val / maxVal) * 100;
+
+                        // 색상 팔레트
+                        const barColor   = under ? (val < 4 ? "#ef4444" : "#f97316") : "#10b981";
+                        const glowColor  = under ? (val < 4 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)") : "rgba(16,185,129,0.15)";
+                        const textColor  = under ? (val < 4 ? "#f87171" : "#fb923c") : "#34d399";
+                        const borderClr  = active
+                          ? "var(--accent-color)"
+                          : under
+                            ? (val < 4 ? "rgba(239,68,68,0.5)" : "rgba(249,115,22,0.4)")
+                            : "transparent";
+                        const bgColor    = active
+                          ? "rgba(59,130,246,0.15)"
+                          : under
+                            ? (val < 4 ? "rgba(239,68,68,0.07)" : "rgba(249,115,22,0.07)")
+                            : "rgba(255,255,255,0.03)";
+
+                        return (
+                          <div key={s.label}
+                            onClick={() => setFilterAuthor(active ? null : s.label)}
+                            title={`${s.label}: ${val}h${under ? " ⚠️ 8시간 미만" : ""}`}
+                            style={{
+                              cursor: "pointer",
+                              padding: "0.65rem 0.75rem",
+                              borderRadius: "10px",
+                              border: `1px solid ${borderClr}`,
+                              background: bgColor,
+                              boxShadow: active ? `0 0 12px ${glowColor}` : under ? `0 0 8px ${glowColor}` : "none",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            {/* 이름 */}
+                            <div style={{
+                              fontSize: "0.78rem",
+                              fontWeight: "bold",
+                              color: active ? "white" : under ? textColor : "#ccc",
+                              marginBottom: "0.35rem",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}>
+                              {active ? "✅ " : under ? "⚠️ " : ""}{s.label}
+                            </div>
+
+                            {/* 시간 수치 */}
+                            <div style={{
+                              fontSize: "1.05rem",
+                              fontWeight: "bold",
+                              color: textColor,
+                              marginBottom: "0.4rem",
+                              lineHeight: 1,
+                            }}>
+                              {val}h
+                            </div>
+
+                            {/* 미니 바 */}
+                            <div style={{ height: "4px", background: "#1a1a2e", borderRadius: "2px" }}>
+                              <div style={{
+                                width: `${pct}%`,
+                                height: "100%",
+                                background: barColor,
+                                borderRadius: "2px",
+                                transition: "width 0.6s",
+                              }} />
+                            </div>
+
+                            {/* 8h 기준 표시 */}
+                            {under && (
+                              <div style={{ fontSize: "0.68rem", color: textColor, marginTop: "0.3rem", opacity: 0.85 }}>
+                                {(THRESHOLD - val).toFixed(1)}h 부족
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
+
             </div>
           )}
         </div>
