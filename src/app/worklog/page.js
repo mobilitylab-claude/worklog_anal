@@ -40,6 +40,7 @@ export default function WorklogAnalyzer() {
 
   // ── 결과 / 상태 ────────────────────────────────────────────────
   const [worklogs,      setWorklogs]      = useState([]);
+  const [jiraHost,      setJiraHost]      = useState("");
   const [usedJql,       setUsedJql]       = useState("");
   const [debugLog,      setDebugLog]      = useState([]);
   const [totalIssues,   setTotalIssues]   = useState(0);
@@ -179,6 +180,7 @@ export default function WorklogAnalyzer() {
 
       setStatusMsg(`워크로그 ${data.worklogs?.length ?? 0}건 수집 완료`);
       setWorklogs(data.worklogs || []);
+      setJiraHost(data.jiraHost || "");
       setUsedJql(data.usedJql || "");
       setDebugLog(data.debugLog || []);
       setTotalIssues(data.totalIssues || 0);
@@ -237,6 +239,23 @@ export default function WorklogAnalyzer() {
 
   const toggleColumn = (id) =>
     setVisibleColumns(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+
+  // ── URL 포함 텍스트 링크화 ──────────────────────────────────────
+  const renderComment = (text) => {
+    if (!text) return "(작업 내용 미기재)";
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+
+    return parts.map((part, i) =>
+      urlRegex.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", textDecoration: "underline" }}>
+          {part}
+        </a>
+      ) : (
+        part
+      )
+    );
+  };
 
   // ── 통계 계산 ─────────────────────────────────────────────────
   const statsByMonth = useMemo(() => {
@@ -625,9 +644,9 @@ export default function WorklogAnalyzer() {
                   const THRESHOLD = 8; // 8시간 기준
                   return (
                     <div style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-                      gap: "0.6rem",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.65rem",
                     }}>
                       {statsByUser.map(s => {
                         const val    = parseFloat(s.value);
@@ -656,6 +675,8 @@ export default function WorklogAnalyzer() {
                             title={`${s.label}: ${val}h${under ? " ⚠️ 8시간 미만" : ""}`}
                             style={{
                               cursor: "pointer",
+                              flex: "1 1 140px", // 최소 140px, 공간 있으면 확장
+                              maxWidth: "200px", // 너무 커지는 것 방지
                               padding: "0.65rem 0.75rem",
                               borderRadius: "10px",
                               border: `1px solid ${borderClr}`,
@@ -766,7 +787,15 @@ export default function WorklogAnalyzer() {
                 {filteredWorklogs.map(w => (
                   <tr key={`${w.id}-${w.issueKey}`}>
                     {visibleColumns.includes("started")      && <td style={{ whiteSpace: "nowrap" }}>{new Date(w.started).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}</td>}
-                    {visibleColumns.includes("issueKey")     && <td>{w.issueKey}</td>}
+                    {visibleColumns.includes("issueKey")     && (
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {jiraHost ? (
+                          <a href={`${jiraHost}/browse/${w.issueKey}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-color)", fontWeight: "bold" }}>
+                            {w.issueKey}
+                          </a>
+                        ) : w.issueKey}
+                      </td>
+                    )}
                     {visibleColumns.includes("issueType")    && <td>{w.issueType}</td>}
                     {visibleColumns.includes("issueSummary") && <td style={{ fontSize: "0.8rem" }}>{w.issueSummary}</td>}
                     {visibleColumns.includes("issueStatus")  && <td>{w.issueStatus}</td>}
@@ -777,7 +806,11 @@ export default function WorklogAnalyzer() {
                         <span style={{ color: "#555", fontSize: "0.75rem", marginLeft: "0.3rem" }}>({w.timeSpentRaw})</span>
                       )}
                     </td>}
-                    {visibleColumns.includes("comment")      && <td style={{ fontSize: "0.82rem", whiteSpace: "pre-wrap" }}>{w.comment}</td>}
+                    {visibleColumns.includes("comment")      && (
+                      <td style={{ fontSize: "0.82rem", whiteSpace: "pre-wrap" }}>
+                        {renderComment(w.comment)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
