@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchJiraSearch } from "@/lib/jiraClient";
 
 const extractTextFromADF = (node) => {
   if (typeof node === "string") return node;
@@ -160,45 +161,10 @@ export async function POST(request) {
     debugLog.push(`[실행 JQL] ${appliedJql}`);
     debugLog.push(`[날짜 범위] ${startDate} ~ ${endDate}  (JQL: >= ${startDate} AND < ${endDateNext})`);
 
-    // ── 2. 이슈 전체 페이지네이션 수집 ───────────────────────────
-    const allIssues   = [];
-    let issueStartAt  = 0;
-    let issueFetchLoop = 0;
-
-    while (issueFetchLoop < 200) {
-      issueFetchLoop++;
-      const searchRes = await fetchWithRetry(
-        `${cleanDomain}/rest/api/2/search`,
-        {
-          method:  "POST",
-          headers,
-          body: JSON.stringify({
-            jql:        appliedJql,
-            startAt:    issueStartAt,
-            maxResults: 1000,
-            fields:     ["summary", "issuetype", "status"],
-          }),
-        },
-        debugLog
-      );
-
-      if (!searchRes.ok) {
-        const errBody = await searchRes.text();
-        throw new Error(`이슈 검색 실패 (${searchRes.status}): ${errBody.slice(0, 300)}`);
-      }
-
-      const sd      = await searchRes.json();
-      const issues  = sd.issues || [];
-      const total   = sd.total  ?? 0;
-      allIssues.push(...issues);
-
-      debugLog.push(`[이슈 수집] startAt=${issueStartAt}, 이번=${issues.length}건, 누계=${allIssues.length}/${total}`);
-
-      if (issues.length === 0 || allIssues.length >= total) break;
-      issueStartAt += issues.length;
-    }
-
-    debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈`);
+    // ── 2. 이슈 전체 페이지네이션 수집 (공용 클라이언트 사용) ───────────
+    debugLog.push("[이슈 수집] 시작 (전체 수집 모드)");
+    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status"]);
+    debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈 로드 완료`);
 
     // ── 3. 이슈별 워크로그 순차 수집 + 2차 필터 ─────────────────
     const allWorklogs    = [];

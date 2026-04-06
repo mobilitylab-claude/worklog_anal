@@ -11,6 +11,8 @@ export default function Sidebar() {
     { name: "Filter Generation", path: "/filter-generation", icon: "📋" },
     { name: "저장된 필터 관리", path: "/filter-management", icon: "📑" },
     { name: "워크로그 분석기", path: "/worklog", icon: "⏱️" },
+    { name: "표준 공수 입력", path: "/worklog-input", icon: "✏️" },
+    { name: "표준 및 기준 관리", path: "/standard-management", icon: "⚙️" },
     { name: "JIRA 사용자 관리", path: "/user-management", icon: "👥" },
   ];
 

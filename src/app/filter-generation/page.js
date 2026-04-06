@@ -360,7 +360,7 @@ export default function FilterGeneration() {
 
       {error && <div className="error">{error}</div>}
 
-      <div className="card">
+      <div className="card" style={{ position: "relative" }}>
         {/* 상단 툴바 */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <h2 style={{ fontSize: "1.1rem" }}>조회 결과 ({issues.length}건)</h2>
@@ -406,9 +406,19 @@ export default function FilterGeneration() {
           </div>
         )}
 
-        {loading ? (
-          <div className="loading">데이터를 불러오는 중입니다...</div>
-        ) : issues.length > 0 ? (
+        {loading && (
+          <div className="loading-overlay">
+            <div className="spinner"></div>
+            <div style={{ color: "var(--accent-color)", fontWeight: "bold", fontSize: "1.2rem", marginTop: "1rem" }}>
+              Jira 이슈를 불러오는 중...
+            </div>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginTop: "0.5rem" }}>
+              대량의 데이터를 페이지네이션으로 수집 중입니다. (100개 제한 없음)
+            </p>
+          </div>
+        )}
+
+        {issues.length > 0 ? (
           <div className="table-wrapper">
             <table>
               <thead>
@@ -429,7 +439,7 @@ export default function FilterGeneration() {
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : !loading && (
           <div className="loading" style={{ padding: "4rem 0" }}>
             조회된 이슈가 없습니다. 상단의 JQL 쿼리를 다시 작성해 보세요! 🚀
           </div>
