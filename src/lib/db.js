@@ -181,4 +181,28 @@ db.exec(`
   )
 `);
 
+// ── 워크로그 분석기 자동 생성 스케줄 테이블 ────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS worklog_schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schedule_type TEXT NOT NULL, -- 'daily' 또는 'monthly'
+    target_mode TEXT,
+    target_users_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// ── 워크로그 분석기 리포트 결과 보관함 테이블 ────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS worklog_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schedule_id INTEGER,
+    report_type TEXT NOT NULL, -- 'daily' 또는 'monthly'
+    target_date TEXT NOT NULL, -- 'YYYY-MM-DD' 또는 'YYYY-MM'
+    total_hours REAL DEFAULT 0,
+    report_data_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
 export default db;

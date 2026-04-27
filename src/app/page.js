@@ -70,30 +70,21 @@ export default function Dashboard() {
         const worklogData = await worklogRes.json();
         setWeekWorklogs(worklogData.worklogs || []);
 
-        // 4. 어제자 그룹 모니터링 워크로그 (설정된 그룹 기준)
-        const usersRes = await fetch("/api/users");
-        const usersData = await usersRes.json();
-        const allDbUsers = usersData.users || [];
-        
-        const groupArray = savedGroups.split(",").map(s => s.trim()).filter(Boolean);
-        const groupTargetUsers = allDbUsers.filter(u => groupArray.includes(u.part));
-        setMonitorMemberCount(groupTargetUsers.length);
-
-        if (groupTargetUsers.length > 0) {
-          const monitorRes = await fetch("/api/worklogs", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-               startDate: yesterday, 
-               endDate: yesterday, 
-               targetType: "custom", 
-               targetUsers: groupTargetUsers 
-            })
-          });
-          const monitorData = await monitorRes.json();
-          setMonitorLogs(monitorData.worklogs || []);
+        // 4. 자동 수집된 어제자 워크로그 리포트 (worklog_results 테이블에서 최신 daily 결과)
+        const reportRes = await fetch("/api/worklog-results?type=daily&limit=1");
+        if (reportRes.ok) {
+          const reportData = await reportRes.json();
+          if (reportData.results && reportData.results.length > 0) {
+            const latest = reportData.results[0];
+            let parsedLogs = [];
+            try { parsedLogs = JSON.parse(latest.report_data_json || "[]"); } catch(e) {}
+            setMonitorLogs(parsedLogs);
+            
+            // 고유 작업자 수 확인
+            const uniqueAuthors = new Set(parsedLogs.map(l => l.author));
+            setMonitorMemberCount(uniqueAuthors.size);
+          }
         }
-
       } catch (e) {
         console.error("대시보드 로딩 실패:", e);
       } finally {
@@ -101,23 +92,7 @@ export default function Dashboard() {
       }
     }
     fetchDashboardData();
-  }, [start, end, yesterday]);
-
-  const handleUpdateGroups = async () => {
-    try {
-      await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type" : "application/json" },
-        body: JSON.stringify({ key: "monitor_groups", value: newGroupsText })
-      });
-      alert("모니터링 그룹이 저장되어 익일부터 대시보드에 반영됩니다.");
-      setMonitorGroups(newGroupsText);
-      setIsEditingGroups(false);
-      window.location.reload(); // 데이터 재계산을 위해 페이지 리로드
-    } catch (e) {
-       alert("설정 저장에 실패했습니다.");
-    }
-  };
+  }, [start, end]);
 
   const getStatusColor = (colorName) => {
     if (!colorName) return "default";
@@ -185,13 +160,7 @@ export default function Dashboard() {
         <div className="widget card" style={{ gridRow: "span 2" }}>
           <div className="widget-header">
             <div>
-              <h2 style={{ display: "inline-block", marginRight: "0.5rem" }}>📋 어제자 실적 모니터링</h2>
-              <button 
-                onClick={() => { setIsEditingGroups(true); setNewGroupsText(monitorGroups); }} 
-                style={{ background: "transparent", border: "1px solid var(--border-color)", color: "var(--text-secondary)", fontSize: "0.7rem", padding: "2px 6px", borderRadius: "4px", cursor: "pointer", marginRight: "0.5rem" }}
-              >
-                그룹 설정
-              </button>
+              <h2 style={{ display: "inline-block", marginRight: "0.5rem" }}>🤖 일일 작업 리포트 (자동)</h2>
               <button 
                 onClick={() => setMonitorViewMode(monitorViewMode === "chart" ? "list" : "chart")}
                 style={{ background: "var(--accent-color)", border: "none", color: "white", fontSize: "0.7rem", padding: "3px 8px", borderRadius: "4px", cursor: "pointer" }}
@@ -202,19 +171,8 @@ export default function Dashboard() {
             <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{yesterday} 실적</span>
           </div>
           <div className="widget-content" style={{ maxHeight: "400px", overflowY: "auto" }}>
-            {isEditingGroups && (
-              <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px" }}>
-                <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.5rem" }}>모니터링할 그룹명 (콤마로 구분)</label>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <input type="text" value={newGroupsText} onChange={e => setNewGroupsText(e.target.value)} style={{ flex: 1, padding: "0.3rem 0.5rem", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-color)", color: "white", fontSize: "0.85rem" }} />
-                  <button onClick={handleUpdateGroups} className="btn-primary" style={{ padding: "0.2rem 0.6rem", fontSize: "0.8rem", height: "auto" }}>저장</button>
-                  <button onClick={() => setIsEditingGroups(false)} style={{ padding: "0.2rem 0.6rem", fontSize: "0.8rem", height: "auto", background: "#444", color: "white", border: "none", borderRadius: "4px" }}>취소</button>
-                </div>
-              </div>
-            )}
-            
             <p style={{ fontSize: "0.75rem", marginBottom: "0.75rem", color: "var(--text-secondary)" }}>
-               📌 모니터링: <b>{monitorGroups} ({monitorMemberCount}명)</b>
+               📌 모니터링 대상: <b>{monitorMemberCount > 0 ? `${monitorMemberCount}명 참여` : "데이터 없음"}</b>
             </p>
 
             {loading ? (

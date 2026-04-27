@@ -460,6 +460,32 @@ export default function WorklogAnalyzer() {
             style={{ padding: "0.55rem 2rem", fontWeight: "bold", opacity: loading ? 0.6 : 1 }}>
             📊 쿼리 실행
           </button>
+          <button onClick={async () => {
+            const type = prompt("자동 리포트 주기를 입력하세요 (daily 또는 monthly):", "daily");
+            if (type !== "daily" && type !== "monthly") return;
+            if (!confirm(`현재 참여자 필터 조건으로 '${type}' 자동 리포트를 등록하시겠습니까?\n(daily: 매일 전날 작업기록, monthly: 매월 말일 해당 월 작업기록)`)) return;
+            
+            let tData = [];
+            if (targetMode === "group") tData = dbUsers.filter(u => selectedGroups.includes(u.part));
+            else if (targetMode === "individual") tData = dbUsers.filter(u => selectedUsers.includes(u.id));
+            else tData = [...dbUsers];
+
+            try {
+              const res = await fetch("/api/worklog-schedules", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  schedule_type: type,
+                  target_mode: targetMode,
+                  target_users: tData
+                })
+              });
+              if (res.ok) alert("✅ 자동 리포트 생성이 등록되었습니다.");
+              else alert("등록 실패");
+            } catch (e) { alert("오류: " + e.message); }
+          }} className="btn" style={{ padding: "0.55rem 1.25rem", background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#10b981" }}>
+            ⏰ 스케줄 등록
+          </button>
           <button onClick={handleExport} disabled={worklogs.length === 0} className="btn-success"
             style={{ padding: "0.55rem 1.25rem" }}>
             📥 엑셀 저장
