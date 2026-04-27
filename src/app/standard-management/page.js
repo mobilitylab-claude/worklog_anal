@@ -261,8 +261,22 @@ export default function StandardManagement() {
                     <tr key={t.id}>
                       <td style={{ fontWeight: "bold" }}>{t.name}</td>
                       <td>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.2rem" }}>
-                          {(t.keywords || []).map(kw => <code key={kw} style={{ fontSize: "0.75rem", color: "#fbbf24" }}>{kw}</code>)}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                          {(t.keywords || []).map(kw => (
+                            <span key={kw} style={{ 
+                              background: "rgba(251, 191, 36, 0.15)", 
+                              color: "#fbbf24", 
+                              border: "1px solid rgba(251, 191, 36, 0.4)",
+                              padding: "3px 10px", 
+                              borderRadius: "14px", 
+                              fontSize: "0.75rem",
+                              fontWeight: "bold",
+                              boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+                              display: "inline-block"
+                            }}>
+                              {kw}
+                            </span>
+                          ))}
                         </div>
                       </td>
                       <td style={{ fontSize: "0.8rem", color: "#777" }}>{t.content}</td>

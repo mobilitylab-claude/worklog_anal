@@ -221,16 +221,29 @@ export default function UserManagement() {
 
   // [수정 모드] State
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ part: "", name: "", dt_account: "", email: "" });
+  const [editForm, setEditForm] = useState({ part: "", name: "", dt_account: "", email: "", is_active: 1 });
 
   const startEdit = (user) => {
     setEditingId(user.id);
-    setEditForm({ part: user.part, name: user.name, dt_account: user.dt_account, email: user.email });
+    setEditForm({ part: user.part, name: user.name, dt_account: user.dt_account, email: user.email, is_active: user.is_active });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ part: "", name: "", dt_account: "", email: "" });
+    setEditForm({ part: "", name: "", dt_account: "", email: "", is_active: 1 });
+  };
+
+  const toggleUserActive = async (user) => {
+    try {
+      const res = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type" : "application/json" },
+        body: JSON.stringify({ id: user.id, part: user.part, name: user.name, dt_account: user.dt_account, email: user.email, is_active: user.is_active === 0 ? 1 : 0 })
+      });
+      if (res.ok) fetchUsers();
+    } catch(e) {
+      console.error(e);
+    }
   };
 
   const handleSaveEdit = async (id) => {
@@ -374,9 +387,9 @@ export default function UserManagement() {
                   <th style={{ width: "15%" }}>소속 파트</th>
                   <th style={{ width: "20%" }}>이름</th>
                   <th style={{ width: "15%" }}>DT계정</th>
-                  <th style={{ width: "25%" }}>이메일</th>
-                  <th style={{ width: "13%" }}>추가된 날짜</th>
-                  <th style={{ width: "12%", textAlign: "right" }}>관리</th>
+                  <th style={{ width: "20%" }}>이메일</th>
+                  <th style={{ width: "10%" }}>투입 상태</th>
+                  <th style={{ width: "20%", textAlign: "right" }}>관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -388,7 +401,12 @@ export default function UserManagement() {
                         <td><input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} style={{ width: "100%", padding: "4px 8px", background: "#000", border: "1px solid var(--accent-color)", color: "white", borderRadius: "4px" }} /></td>
                         <td><input type="text" value={editForm.dt_account} onChange={e => setEditForm({...editForm, dt_account: e.target.value})} style={{ width: "100%", padding: "4px 8px", background: "#000", border: "1px solid var(--accent-color)", color: "white", borderRadius: "4px" }} /></td>
                         <td><input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} style={{ width: "100%", padding: "4px 8px", background: "#000", border: "1px solid var(--accent-color)", color: "white", borderRadius: "4px" }} /></td>
-                        <td style={{ fontSize: "0.85rem", color: "gray" }}>-</td>
+                        <td>
+                          <select value={editForm.is_active} onChange={e => setEditForm({...editForm, is_active: parseInt(e.target.value)})} style={{ background: "#000", color: "white", border: "1px solid var(--accent-color)", borderRadius: "4px", padding: "4px" }}>
+                            <option value={1}>투입</option>
+                            <option value={0}>미투입</option>
+                          </select>
+                        </td>
                         <td style={{ textAlign: "right", display: "flex", gap: "0.3rem", justifyContent: "flex-end" }}>
                           <button onClick={() => handleSaveEdit(u.id)} className="btn" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem", height: "auto", background: "#10b981", color: "white" }}>저장</button>
                           <button onClick={cancelEdit} className="btn" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem", height: "auto", background: "#444", color: "white" }}>취소</button>
@@ -396,11 +414,15 @@ export default function UserManagement() {
                       </>
                     ) : (
                       <>
-                        <td style={{ color: "var(--text-secondary)" }}>{u.part}</td>
-                        <td style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "1.05rem" }}>{u.name}</td>
-                        <td><code style={{ background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: "4px", color: "var(--accent-color)" }}>{u.dt_account}</code></td>
-                        <td style={{ color: "var(--text-secondary)" }}>{u.email}</td>
-                        <td style={{ fontSize: "0.85rem", color: "gray" }}>{new Date(u.created_at).toLocaleDateString("ko-KR")}</td>
+                        <td style={{ color: "var(--text-secondary)", opacity: u.is_active === 0 ? 0.5 : 1 }}>{u.part}</td>
+                        <td style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "1.05rem", opacity: u.is_active === 0 ? 0.5 : 1 }}>{u.is_active === 0 && <span style={{color:"#ef4444", fontSize:"0.8rem", marginRight:"4px"}}>[미투입]</span>}{u.name}</td>
+                        <td style={{ opacity: u.is_active === 0 ? 0.5 : 1 }}><code style={{ background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: "4px", color: "var(--accent-color)" }}>{u.dt_account}</code></td>
+                        <td style={{ color: "var(--text-secondary)", opacity: u.is_active === 0 ? 0.5 : 1 }}>{u.email}</td>
+                        <td>
+                          <button onClick={() => toggleUserActive(u)} style={{ background: u.is_active !== 0 ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)", border: `1px solid ${u.is_active !== 0 ? "#10b981" : "#ef4444"}`, color: u.is_active !== 0 ? "#10b981" : "#ef4444", padding: "3px 8px", borderRadius: "12px", fontSize: "0.75rem", cursor: "pointer" }}>
+                            {u.is_active !== 0 ? "투입중" : "미투입"}
+                          </button>
+                        </td>
                         <td style={{ textAlign: "right", display: "flex", gap: "0.3rem", justifyContent: "flex-end" }}>
                           <button 
                              className="btn" 

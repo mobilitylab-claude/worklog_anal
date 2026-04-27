@@ -48,7 +48,10 @@ export default function ProjectMonitoring() {
 
   useEffect(() => {
     fetch("/api/standards/projects").then(r => r.json()).then(d => setProjects(d.projects || []));
-    fetch("/api/users").then(r => r.json()).then(d => setDbUsers(d.users || []));
+    fetch("/api/users").then(r => r.json()).then(d => {
+      // 투입이 안된 인력(is_active === 0)은 제외
+      setDbUsers((d.users || []).filter(u => u.is_active !== 0));
+    });
   }, []);
 
   const handleProjectChange = (id) => {
@@ -112,10 +115,14 @@ export default function ProjectMonitoring() {
       let targetUsersData = [];
       if (targetMode !== "all" && selectedUsers.length > 0) {
         targetUsersData = dbUsers.filter(u => selectedUsers.includes(u.id));
-        const accounts = [...new Set(targetUsersData.map(u => u.dt_account).filter(Boolean))];
-        if (accounts.length > 0) {
-          orFilters.push(`worklogAuthor in (${accounts.map(a => `"${a}"`).join(", ")})`);
-        }
+      } else {
+        // 전체 모드라도 투입된 인력(dbUsers)에 대해서만 필터링하도록 강제 설정
+        targetUsersData = [...dbUsers];
+      }
+
+      const accounts = [...new Set(targetUsersData.map(u => u.dt_account).filter(Boolean))];
+      if (accounts.length > 0) {
+        orFilters.push(`worklogAuthor in (${accounts.map(a => `"${a}"`).join(", ")})`);
       }
 
       let finalJql = dateJql;
@@ -131,7 +138,7 @@ export default function ProjectMonitoring() {
           endDate, 
           includeKeyword,
           excludeKeyword,
-          targetType: targetMode === "all" ? "all" : "custom", 
+          targetType: "custom", // 무조건 custom으로 보내어 targetUsersData만 필터링되게 함
           targetUsers: targetUsersData, 
           overrideJql: finalJql 
         }),

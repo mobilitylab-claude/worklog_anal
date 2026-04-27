@@ -53,11 +53,17 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
-    const { id, part, name, dt_account, email } = await request.json();
+    const { id, part, name, dt_account, email, is_active } = await request.json();
     if (!id) return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
 
-    const stmt = db.prepare('UPDATE users SET part = ?, name = ?, dt_account = ?, email = ? WHERE id = ?');
-    stmt.run(part, name, dt_account, email, id);
+    let stmt;
+    if (is_active !== undefined) {
+      stmt = db.prepare('UPDATE users SET part = ?, name = ?, dt_account = ?, email = ?, is_active = ? WHERE id = ?');
+      stmt.run(part, name, dt_account, email, is_active ? 1 : 0, id);
+    } else {
+      stmt = db.prepare('UPDATE users SET part = ?, name = ?, dt_account = ?, email = ? WHERE id = ?');
+      stmt.run(part, name, dt_account, email, id);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
