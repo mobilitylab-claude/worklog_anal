@@ -67,6 +67,21 @@ export async function GET(request) {
 
       if (!isTargetDay) continue;
 
+      const reportMonth = rEndDate.substring(0, 7); // "YYYY-MM"
+
+      // ── 중복 생성 방지 (Idempotency Check) ──
+      // 이미 이번 달(reportMonth)에 대해 해당 스케줄로 생성된 리포트가 있는지 확인
+      const existingReport = db.prepare(`
+        SELECT count(*) as cnt 
+        FROM report_results 
+        WHERE scheduled_report_id = ? AND report_month = ?
+      `).get(schedule.id, reportMonth);
+
+      if (existingReport && existingReport.cnt > 0) {
+        logs.push(`[Skip] ${project_code}: ${reportMonth} 월의 리포트가 이미 존재합니다 (중복 방지)`);
+        continue;
+      }
+
       // ── 리포트 데이터 생성 ──
       logs.push(`[Process] ${project_code}: ${rStartDate} ~ ${rEndDate} 데이터 수집 시작`);
       
@@ -150,7 +165,6 @@ export async function GET(request) {
       const totalHours = parseFloat((totalSeconds / 3600).toFixed(1));
       const totalMM = parseFloat((totalHours / 8 / 20.5).toFixed(3));
 
-      const reportMonth = rEndDate.substring(0, 7); // "YYYY-MM"
       const targetPeriod = `${rStartDate} ~ ${rEndDate}`;
 
       // DB 저장
