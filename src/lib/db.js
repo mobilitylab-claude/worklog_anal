@@ -151,4 +151,34 @@ if (checkTypes.count === 0) {
   insertType.run("회의", "프로젝트 정기 회의", JSON.stringify(["meeting", "review"]));
 }
 
+// ── 월간 리포트 자동 생성 스케줄 테이블 ────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS scheduled_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    parent_key TEXT,
+    include_keyword TEXT,
+    exclude_keyword TEXT,
+    target_mode TEXT,
+    target_users_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id)
+  )
+`);
+
+// ── 월간 리포트 생성 결과 보관함 테이블 ────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS report_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scheduled_report_id INTEGER,
+    project_id INTEGER NOT NULL,
+    report_month TEXT NOT NULL,
+    target_period TEXT NOT NULL,
+    total_hours REAL DEFAULT 0,
+    total_mm REAL DEFAULT 0,
+    report_data_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
 export default db;

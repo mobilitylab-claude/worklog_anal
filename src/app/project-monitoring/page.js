@@ -192,6 +192,38 @@ export default function ProjectMonitoring() {
     }
   };
 
+  const handleSaveSchedule = async () => {
+    if (!selectedProjectId) { alert("프로젝트를 선택해 주세요."); return; }
+    if (!confirm("현재 설정된 조건(부모키, 참여자 필터, 키워드 등)으로 매월 자동 리포트를 생성하시겠습니까?")) return;
+
+    try {
+      let targetUsersData = [];
+      if (targetMode !== "all" && selectedUsers.length > 0) {
+        targetUsersData = dbUsers.filter(u => selectedUsers.includes(u.id));
+      } else {
+        targetUsersData = [...dbUsers];
+      }
+
+      const res = await fetch("/api/scheduled-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: selectedProjectId,
+          parent_key: parentKey,
+          include_keyword: includeKeyword,
+          exclude_keyword: excludeKeyword,
+          target_mode: targetMode,
+          target_users: targetUsersData
+        })
+      });
+
+      if (!res.ok) throw new Error("스케줄 등록 실패");
+      alert("✅ 자동 리포트 생성이 등록되었습니다. 매월 마지막 날 또는 프로젝트 종료일에 결과가 생성됩니다.");
+    } catch (e) {
+      alert("오류: " + e.message);
+    }
+  };
+
   const calculateMM = (hrs) => (hrs / 8 / 20.5).toFixed(3);
 
   const statsByType = useMemo(() => {
@@ -322,7 +354,14 @@ export default function ProjectMonitoring() {
           </div>
         </div>
 
-        <div style={{ textAlign: "right" }}><button onClick={handleSearch} disabled={loading} className="btn-primary" style={{ padding: "0.7rem 3rem", fontWeight: "bold" }}>분석 실행</button></div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <button onClick={handleSaveSchedule} className="btn" style={{ padding: "0.7rem 1.5rem", background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#10b981", borderRadius: "8px", fontWeight: "bold" }}>
+            ⏰ 현재 조건으로 월간 리포트 자동 생성 등록
+          </button>
+          <button onClick={handleSearch} disabled={loading} className="btn-primary" style={{ padding: "0.7rem 3rem", fontWeight: "bold" }}>
+            분석 실행
+          </button>
+        </div>
       </div>
 
       {worklogs.length > 0 && (
