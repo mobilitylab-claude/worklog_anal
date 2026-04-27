@@ -34,9 +34,32 @@ db.exec(`
     name TEXT NOT NULL,
     start_date DATE,
     end_date DATE,
+    parent_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
+
+// 🚀 [마이그레이션] projects 테이블에 parent_key 컬럼이 없는 경우 추가
+try {
+  const tableInfo = db.prepare("PRAGMA table_info(projects)").all();
+  const hasParentKey = tableInfo.some(c => c.name === 'parent_key');
+  if (!hasParentKey) {
+    console.log("Adding parent_key column to projects table...");
+    try {
+      db.exec("ALTER TABLE projects ADD COLUMN parent_key TEXT");
+      console.log("Migration finished successfully.");
+    } catch (alterErr) {
+      // 여러 프로세스(빌드 워커 등)가 동시에 실행될 때 이미 컬럼이 생성된 경우 무시
+      if (alterErr.message.includes("duplicate column name")) {
+        console.log("Column parent_key already exists (parallel process).");
+      } else {
+        throw alterErr;
+      }
+    }
+  }
+} catch (err) {
+  console.error("Migration for projects table failed:", err);
+}
 
 // ── 작업유형별 입력 기준 테이블 (기준키워드 삭제됨) ───────────────
 db.exec(`

@@ -8,7 +8,7 @@ export default function StandardManagement() {
 
   // ── Project State ────────────────────────────────────────────
   const [projects, setProjects] = useState([]);
-  const [projForm, setProjForm] = useState({ code: "", name: "", startDate: "", endDate: "" });
+  const [projForm, setProjForm] = useState({ code: "", name: "", startDate: "", endDate: "", parentKey: "" });
   const [editingProjId, setEditingProjId] = useState(null);
 
   // ── WorkType State ───────────────────────────────────────────
@@ -53,7 +53,7 @@ export default function StandardManagement() {
       if (!res.ok) throw new Error(data.error || "처리 실패");
 
       alert("📂 과제 정보가 성공적으로 저장되었습니다!");
-      setProjForm({ code: "", name: "", startDate: "", endDate: "" });
+      setProjForm({ code: "", name: "", startDate: "", endDate: "", parentKey: "" });
       setEditingProjId(null);
       fetchData();
     } catch (err) {
@@ -142,6 +142,11 @@ export default function StandardManagement() {
                 <input type="text" value={projForm.name} onChange={e => setProjForm({...projForm, name: e.target.value})} required 
                    style={{ width: "100%", padding: "0.6rem", borderRadius: "6px", background: "#111", border: "1px solid #333", color: "white", marginTop: "4px" }} />
               </div>
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ fontSize: "0.85rem", color: "#888" }}>부모 Jira 키 (Parent Key)</label>
+                <input type="text" value={projForm.parentKey} onChange={e => setProjForm({...projForm, parentKey: e.target.value})} 
+                   style={{ width: "100%", padding: "0.6rem", borderRadius: "6px", background: "#111", border: "1px solid #333", color: "white", marginTop: "4px" }} placeholder="예: PROJ-123" />
+              </div>
               <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: "0.85rem", color: "#888" }}>시작일</label>
@@ -157,7 +162,7 @@ export default function StandardManagement() {
               <button type="submit" className="btn-primary" style={{ width: "100%", padding: "0.75rem" }}>
                 {editingProjId ? "수정 완료" : "등록 하기"}
               </button>
-              {editingProjId && <button onClick={() => { setEditingProjId(null); setProjForm({code:"",name:"",startDate:"",endDate:""}); }} style={{ width: "100%", marginTop: "0.5rem", background: "none", border: "none", color: "#666", cursor: "pointer" }}>취소</button>}
+              {editingProjId && <button onClick={() => { setEditingProjId(null); setProjForm({code:"",name:"",startDate:"",endDate:"",parentKey:""}); }} style={{ width: "100%", marginTop: "0.5rem", background: "none", border: "none", color: "#666", cursor: "pointer" }}>취소</button>}
             </form>
           </div>
           {/* 목록 */}
@@ -169,22 +174,27 @@ export default function StandardManagement() {
                   <tr>
                     <th>코드</th>
                     <th>과제명</th>
+                    <th>부모키</th>
                     <th>기간</th>
                     <th style={{ textAlign: "right" }}>관리</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {projects.map(p => (
-                    <tr key={p.id}>
+                  {projects.map(p => {
+                    const isEnded = p.end_date && p.end_date < new Date().toISOString().split("T")[0];
+                    return (
+                    <tr key={p.id} style={{ opacity: isEnded ? 0.4 : 1, transition: "opacity 0.2s" }}>
                       <td style={{ fontWeight: "bold", color: "var(--accent-color)" }}>{p.code}</td>
-                      <td>{p.name}</td>
+                      <td>{isEnded ? <span style={{color: "#ef4444", fontSize: "0.8rem", marginRight: "6px", fontWeight: "bold"}}>[종료]</span> : ""}{p.name}</td>
+                      <td style={{ fontSize: "0.82rem", color: "#60a5fa" }}>{p.parent_key || "-"}</td>
                       <td style={{ fontSize: "0.82rem", color: "#777" }}>{p.start_date || "-"} ~ {p.end_date || "-"}</td>
                       <td style={{ textAlign: "right" }}>
-                        <button onClick={() => { setEditingProjId(p.id); setProjForm({code:p.code, name:p.name, startDate:p.start_date||"", endDate:p.end_date||""}) }} style={{ background: "none", border: "none", color: "#3b82f6", cursor: "pointer", marginRight: "0.5rem" }}>수정</button>
+                        <button onClick={() => { setEditingProjId(p.id); setProjForm({code:p.code, name:p.name, startDate:p.start_date||"", endDate:p.end_date||"", parentKey:p.parent_key||""}) }} style={{ background: "none", border: "none", color: "#3b82f6", cursor: "pointer", marginRight: "0.5rem" }}>수정</button>
                         <button onClick={() => handleDeleteProj(p.id)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}>삭제</button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

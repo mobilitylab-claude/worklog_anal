@@ -67,8 +67,9 @@ export default function WorklogInput() {
   // ── Jira 연동 상태 ──────────────────────────────────────────
   const [loading,     setLoading]     = useState(false);
   const [searchKey,    setSearchKey]    = useState("");
-  const [recentIssues, setRecentIssues] = useState([]);
-  const [searching,   setSearching]   = useState(false);
+  const [recentIssues, setRecentIssues] = useState([]); // [{ key, summary, totalHours }]
+  const [todayTotal,   setTodayTotal]   = useState(0);    // 오늘 전체 등록 공수(h)
+  const [searching,     setSearching]     = useState(false);
 
   // ── 권장 시간 계산 (1.25배 Scale-up) ───────────────────────────
   const recommendedHours = useMemo(() => {
@@ -77,30 +78,56 @@ export default function WorklogInput() {
   }, [actualHours, isScaleUp]);
 
   // ── 최종 포맷 미리보기 ─────────────────────────────────────────
-  // 형식: [계약과제 코드] / [분류 키워드] / [이슈 번호] - [작업 내용]
+  // 형식: 계약과제 코드 / 분류 키워드 / 작업 내용 (대괄호 및 이슈번호 제외)
   const finalComment = useMemo(() => {
-    const prefix = `[${projectCode}] / [${selectedKw || "키워드"}] / [${issueKey || "이슈번호"}] - `;
+    const prefix = `${projectCode} / ${selectedKw || "키워드"} / `;
     return `${prefix}${comment}`;
-  }, [projectCode, selectedKw, issueKey, comment]);
+  }, [projectCode, selectedKw, comment]);
 
   // ── 최근 이슈 로드 (분석 기능을 통해 간접적으로 가져옴) ──────────
   const loadRecentIssues = async () => {
     setSearching(true);
     try {
+      const todayStr = new Date().toISOString().split("T")[0];
       const res = await fetch("/api/worklogs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startDate: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], // 최근 30일
-          endDate: new Date().toISOString().split("T")[0],
+          endDate: todayStr,
           targetType: "me",
         }),
       });
       const data = await res.json();
       if (data.worklogs) {
-        // 중복 제거 및 이슈 키 목록 정제
-        const keys = Array.from(new Set(data.worklogs.map(w => w.issueKey))).slice(0, 10);
-        setRecentIssues(keys);
+        const logs = data.worklogs;
+        
+        // 1. 오늘 총 시간 계산
+        const todayLogs = logs.filter(l => l.started.startsWith(todayStr));
+        const todayHrs = todayLogs.reduce((sum, l) => sum + (l.timeSpentSeconds || 0), 0) / 3600;
+        setTodayTotal(todayHrs);
+
+        // 2. 최근 이슈별 요약 및 누적 시간 계산
+        const issueMap = {};
+        logs.forEach(l => {
+          if (!issueMap[l.issueKey]) {
+            issueMap[l.issueKey] = { 
+              key: l.issueKey, 
+              summary: l.issueSummary, 
+              totalSeconds: 0 
+            };
+          }
+          issueMap[l.issueKey].totalSeconds += (l.timeSpentSeconds || 0);
+        });
+
+        // 최근 작업 순으로 정렬 (가장 최근 로그가 있는 이슈가 위로)
+        const sortedKeys = Array.from(new Set(logs.map(l => l.issueKey))).slice(0, 10);
+        const processedIssues = sortedKeys.map(key => ({
+          ...issueMap[key],
+          totalHours: (issueMap[key].totalSeconds / 3600).toFixed(1)
+        }));
+
+        setRecentIssues(processedIssues);
       }
     } catch (e) {
       console.error("이슈 조회 실패:", e);
@@ -153,7 +180,7 @@ export default function WorklogInput() {
     <div className="page-container">
       <div className="page-header" style={{ marginBottom: "2rem" }}>
         <h1>표준 공수 입력 (MOBIS)</h1>
-        <p>Confluence 가이드라인에 따른 [계약과제 / 유형 / 이슈] 표준 포맷으로 공수를 등록합니다.</p>
+        <p>Confluence 가이드라인에 따른 표준 프로젝트 정보와 작업 유형을 조합하여 공수를 등록합니다.</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "2rem" }}>
@@ -161,27 +188,45 @@ export default function WorklogInput() {
         <div className="card">
           <h2 style={{ fontSize: "1.1rem", marginBottom: "1.5rem" }}>✏️ 작업 기록 작성</h2>
 
-          {/* 1. 이슈 선택 */}
+          {/* 1. 이슈 선택 (최근 작업 내역 기반) */}
           <div style={{ marginBottom: "1.5rem" }}>
-            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "#888" }}>01. 대상 이슈</label>
-            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-              <input 
-                type="text" 
-                value={issueKey} 
-                onChange={e => setIssueKey(e.target.value.toUpperCase())}
-                placeholder="이슈 키 입력 (예: AVNSTDG6-1234)"
-                style={{ flex: 1, padding: "0.6rem 0.8rem", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "white" }}
-              />
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-              {recentIssues.map(key => (
-                <span key={key} 
-                  onClick={() => setIssueKey(key)}
-                  style={{ cursor: "pointer", fontSize: "0.75rem", padding: "2px 8px", background: "#1a1a2e", border: "1px solid #333", borderRadius: "4px", color: issueKey === key ? "var(--accent-color)" : "#777" }}>
-                  {key}
-                </span>
+            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "#888" }}>
+              01. 대상 이슈 선택 (최근 30일 이내 작업한 이슈목록)
+            </label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", padding: "1rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid #222" }}>
+              {recentIssues.length === 0 && !searching && (
+                <span style={{ fontSize: "0.8rem", color: "#555" }}>최근 작업한 이슈가 없습니다.</span>
+              )}
+              {searching && (
+                <span style={{ fontSize: "0.8rem", color: "#555" }}>조회 중...</span>
+              )}
+              {recentIssues.map(issue => (
+                <button key={issue.key} 
+                  onClick={() => setIssueKey(issue.key)}
+                  style={{ 
+                    cursor: "pointer", fontSize: "0.75rem", padding: "4px 10px", 
+                    background: issueKey === issue.key ? "var(--accent-color)" : "#1a1a2e", 
+                    border: `1px solid ${issueKey === issue.key ? "var(--accent-color)" : "#333"}`, 
+                    borderRadius: "6px", color: issueKey === issue.key ? "white" : "#ccc",
+                    transition: "all 0.2s"
+                  }}>
+                  {issue.key}
+                </button>
               ))}
             </div>
+            {issueKey && (() => {
+              const selected = recentIssues.find(i => i.key === issueKey);
+              return (
+                <div style={{ marginTop: "0.75rem", padding: "0.8rem", background: "rgba(59,130,246,0.08)", borderRadius: "8px", borderLeft: "4px solid var(--accent-color)" }}>
+                  <div style={{ fontSize: "0.85rem", color: "white", fontWeight: "bold", marginBottom: "0.2rem" }}>
+                    {selected ? selected.summary : "이슈 상세 정보를 불러올 수 없습니다."}
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                    {selected && `🕒 최근 30일 누적 공수: ${selected.totalHours}h`}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* 2. 과제 및 유형 */}
@@ -247,6 +292,9 @@ export default function WorklogInput() {
                   <input type="checkbox" checked={isScaleUp} onChange={e => setIsScaleUp(e.target.checked)} /> 1.25x UP
                 </label>
               </div>
+              <div style={{ fontSize: "0.7rem", color: todayTotal >= 8 ? "#10b981" : "#f97316", marginTop: "2px" }}>
+                🎯 오늘 총 등록: {todayTotal.toFixed(1)}h / 8h
+              </div>
             </div>
           </div>
 
@@ -280,9 +328,9 @@ export default function WorklogInput() {
           <div className="card" style={{ fontSize: "0.85rem", color: "#888" }}>
             <h3 style={{ fontSize: "0.9rem", color: "white", marginBottom: "0.75rem" }}>💡 입력 가이드</h3>
             <ul style={{ paddingLeft: "1.25rem", lineHeight: "1.6" }}>
-              <li><strong>포맷준수:</strong> [계약과제] / [유형] / [이슈] - [상세내용]</li>
-              <li><strong>표준유형:</strong> <code>pr</code>(개발), <code>meeting</code>(회의), <code>issue</code>(수정) 등</li>
-              <li><strong>공수원칙:</strong> 실제 시간 대비 약 1.2배 scale-up (일일 총 8~11h 권장)</li>
+              <li><strong>포맷준수:</strong> 계약과제 / 분류키워드 / 작업내용</li>
+              <li><strong>표준유형:</strong> <code>pr</code>(개발), <code>meeting</code>(회의), <code>review</code>(분석) 등</li>
+              <li><strong>공수원칙:</strong> 실제 시간 대비 약 1.25배 scale-up (일일 총 8~11h 권장)</li>
               <li><strong>Daily 원칙:</strong> 그날 작업은 그날 바로 등록하세요.</li>
             </ul>
           </div>

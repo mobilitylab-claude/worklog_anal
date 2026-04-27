@@ -13,10 +13,10 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const { code, name, startDate, endDate } = await request.json();
+    const { code, name, startDate, endDate, parentKey } = await request.json();
     if (!code || !name) return NextResponse.json({ error: "코드와 과제명은 필수입니다." }, { status: 400 });
-    const stmt = db.prepare('INSERT INTO projects (code, name, start_date, end_date) VALUES (?, ?, ?, ?)');
-    const info = stmt.run(code, name, startDate || null, endDate || null);
+    const stmt = db.prepare('INSERT INTO projects (code, name, start_date, end_date, parent_key) VALUES (?, ?, ?, ?, ?)');
+    const info = stmt.run(code, name, startDate || null, endDate || null, parentKey || null);
     return NextResponse.json({ success: true, id: info.lastInsertRowid });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -25,9 +25,9 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
-    const { id, code, name, startDate, endDate } = await request.json();
-    const stmt = db.prepare('UPDATE projects SET code = ?, name = ?, start_date = ?, end_date = ? WHERE id = ?');
-    stmt.run(code, name, startDate, endDate, id);
+    const { id, code, name, startDate, endDate, parentKey } = await request.json();
+    const stmt = db.prepare('UPDATE projects SET code = ?, name = ?, start_date = ?, end_date = ?, parent_key = ? WHERE id = ?');
+    stmt.run(code, name, startDate, endDate, parentKey || null, id);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
