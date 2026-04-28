@@ -355,10 +355,10 @@ export default function ProjectMonitoring() {
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <button onClick={handleSaveSchedule} className="btn" style={{ padding: "0.7rem 1.5rem", background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#10b981", borderRadius: "8px", fontWeight: "bold" }}>
+          <button onClick={handleSaveSchedule} className="btn btn-success">
             ⏰ 현재 조건으로 월간 리포트 자동 생성 등록
           </button>
-          <button onClick={handleSearch} disabled={loading} className="btn-primary" style={{ padding: "0.7rem 3rem", fontWeight: "bold" }}>
+          <button onClick={handleSearch} disabled={loading} className="btn btn-primary">
             분석 실행
           </button>
         </div>
@@ -372,7 +372,7 @@ export default function ProjectMonitoring() {
               <p style={{ fontSize: "0.85rem", color: "#666" }}>총 시간: <b style={{ color: "#10b981" }}>{totalHrs}h</b> | 총 인력: <b style={{ color: "#6366f1" }}>{totalMM} MM</b></p>
             </div>
             <div style={{ display: "flex", gap: "1rem" }}>
-              {(filterType || filterMonth || filterAuthor) && <button onClick={() => {setFilterType(null); setFilterMonth(null); setFilterAuthor(null);}} style={{ background: "none", border: "1px solid #ef4444", color: "#ef4444", padding: "0.4rem 1rem", borderRadius: "8px", cursor: "pointer" }}>초기화</button>}
+              {(filterType || filterMonth || filterAuthor) && <button onClick={() => {setFilterType(null); setFilterMonth(null); setFilterAuthor(null);}} className="btn btn-danger" style={{ height: "auto", padding: "0.3rem 0.8rem", fontSize: "0.75rem" }}>초기화</button>}
               <button onClick={handleExport} className="btn-success" style={{ padding: "0.4rem 1.5rem" }}>엑셀 저장</button>
             </div>
           </div>

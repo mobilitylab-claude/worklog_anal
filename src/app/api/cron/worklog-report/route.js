@@ -8,18 +8,22 @@ const isLastDayOfMonth = (date) => {
   return nextDay.getDate() === 1;
 };
 
-const formatDate = (date) => date.toISOString().split("T")[0];
+// KST 기준으로 날짜 문자열(YYYY-MM-DD) 반환
+const getKstDateString = (dateObj) => {
+  const kst = new Date(dateObj.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().split("T")[0];
+};
 
 export async function GET(request) {
   try {
     const schedules = db.prepare(`SELECT * FROM worklog_schedules`).all();
     
     const todayObj = new Date();
-    const today = formatDate(todayObj);
+    const today = getKstDateString(todayObj);
 
     const yesterdayObj = new Date(todayObj);
     yesterdayObj.setDate(yesterdayObj.getDate() - 1);
-    const yesterday = formatDate(yesterdayObj);
+    const yesterday = getKstDateString(yesterdayObj);
     
     let generatedCount = 0;
     const logs = [];
@@ -41,7 +45,7 @@ export async function GET(request) {
         if (isLastDayOfMonth(todayObj)) {
           isTargetDay = true;
           const firstDayOfMonth = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1);
-          rStartDate = formatDate(firstDayOfMonth);
+          rStartDate = getKstDateString(firstDayOfMonth);
           rEndDate = today;
           targetDateKey = today.substring(0, 7); // "YYYY-MM"
         }
@@ -66,7 +70,7 @@ export async function GET(request) {
       // JQL 조립
       const endDateNextObj = new Date(rEndDate);
       endDateNextObj.setDate(endDateNextObj.getDate() + 1);
-      const endDateNext = formatDate(endDateNextObj);
+      const endDateNext = getKstDateString(endDateNextObj);
       
       let dateJql = `worklogDate >= "${rStartDate}" AND worklogDate < "${endDateNext}"`;
       let orFilters = [];

@@ -163,7 +163,7 @@ export async function POST(request) {
 
     // ── 2. 이슈 전체 페이지네이션 수집 (공용 클라이언트 사용) ───────────
     debugLog.push("[이슈 수집] 시작 (전체 수집 모드)");
-    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status"]);
+    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project"]);
     debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈 로드 완료`);
 
     // ── 3. 이슈별 워크로그 순차 수집 + 2차 필터 ─────────────────
@@ -235,6 +235,31 @@ export async function POST(request) {
           if (!commentText) commentText = JSON.stringify(w.comment);
         }
 
+        // ── 포맷 파싱 (예: Project / Type / Content 또는 [Project] [Type] 내용) ──
+        let parsedProjectCode = "";
+        let parsedWorkType = "";
+        const cleanComment = (commentText || "").trim();
+        
+        // 1. "/" 구분자 지원: Project / Type / Content (최소 2개 세그먼트 필요)
+        const slashMatch = cleanComment.match(/^([^/]+)\s*\/\s*([^/]+)(?:\s*\/[\s\S]*)?$/);
+        // 2. "[]" 구분자 지원: [Project] [Type]
+        const bracketMatch = cleanComment.match(/^\[([^\]]+)\]\s*\[([^\]]+)\]/);
+        
+        if (slashMatch) {
+          parsedProjectCode = slashMatch[1].trim();
+          parsedWorkType = slashMatch[2].trim();
+        } else if (bracketMatch) {
+          parsedProjectCode = bracketMatch[1].trim();
+          parsedWorkType = bracketMatch[2].trim();
+        } else {
+          // 단일 대괄호 등 기타 패턴
+          const singleBracket = cleanComment.match(/^\[([^\]]+)\]/);
+          if (singleBracket) {
+            parsedProjectCode = singleBracket[1].trim();
+            parsedWorkType = "기타";
+          }
+        }
+
         // ── 키워드 필터 ──
         const includes = (includeKeyword || "").split(",").map(s => s.trim()).filter(Boolean);
         const excludes = (excludeKeyword || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -253,6 +278,10 @@ export async function POST(request) {
           issueSummary:    issue.fields.summary,
           issueType:       issue.fields.issuetype?.name || "-",
           issueStatus:     issue.fields.status?.name    || "-",
+          projectKey:      issue.fields.project?.key    || "-",
+          projectName:     issue.fields.project?.name   || "-",
+          projectCode:     parsedProjectCode || "",
+          workType:        parsedWorkType    || "",
           author:          w.author?.displayName || w.author?.name || "",
           authorUsername:  w.author?.name        || "",
           started:         w.started,

@@ -159,10 +159,10 @@ export default function StandardManagement() {
                     style={{ width: "100%", padding: "0.6rem", borderRadius: "6px", background: "#111", border: "1px solid #333", color: "white", marginTop: "4px" }} />
                 </div>
               </div>
-              <button type="submit" className="btn-primary" style={{ width: "100%", padding: "0.75rem" }}>
+              <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>
                 {editingProjId ? "수정 완료" : "등록 하기"}
               </button>
-              {editingProjId && <button onClick={() => { setEditingProjId(null); setProjForm({code:"",name:"",startDate:"",endDate:"",parentKey:""}); }} style={{ width: "100%", marginTop: "0.5rem", background: "none", border: "none", color: "#666", cursor: "pointer" }}>취소</button>}
+              {editingProjId && <button onClick={() => { setEditingProjId(null); setProjForm({code:"",name:"",startDate:"",endDate:"",parentKey:""}); }} className="btn btn-secondary" style={{ width: "100%", marginTop: "0.5rem" }}>취소</button>}
             </form>
           </div>
           {/* 목록 */}
@@ -237,10 +237,10 @@ export default function StandardManagement() {
                 <input type="text" value={typeForm.remarks} onChange={e => setTypeForm({...typeForm, remarks: e.target.value})}
                   style={{ width: "100%", padding: "0.6rem", borderRadius: "6px", background: "#111", border: "1px solid #333", color: "white", marginTop: "4px" }} />
               </div>
-              <button type="submit" className="btn-primary" style={{ width: "100%", padding: "0.75rem" }}>
+              <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>
                 {editingTypeId ? "수정 완료" : "등록 하기"}
               </button>
-              {editingTypeId && <button onClick={() => { setEditingTypeId(null); setTypeForm({name:"",content:"",keywords:[],remarks:""}); }} style={{ width: "100%", marginTop: "0.5rem", background: "none", border: "none", color: "#666", cursor: "pointer" }}>취소</button>}
+              {editingTypeId && <button onClick={() => { setEditingTypeId(null); setTypeForm({name:"",content:"",keywords:[],remarks:""}); }} className="btn btn-secondary" style={{ width: "100%", marginTop: "0.5rem" }}>취소</button>}
             </form>
           </div>
           {/* 목록 */}

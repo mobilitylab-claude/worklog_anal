@@ -115,6 +115,16 @@ body {
   border-color: var(--accent-color);
 }
 
+/* Date Input Fix for Dark Mode */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+  opacity: 0.8;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
 .avatar {
   background: var(--accent-gradient);
   color: white;
@@ -272,38 +282,72 @@ body {
 }
 
 .btn {
-  padding: 0.75rem 1.25rem;
-  border-radius: 8px;
+  padding: 0.65rem 1.5rem;
+  border-radius: 5px; /* 약간의 라운드 (5px) */
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   font-family: inherit;
-  height: 48px; /* textarea와 높이 맞춤 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
-  background: var(--accent-gradient);
-  color: white;
+  background: #b4c6ff; /* 파스텔 블루 */
+  color: #1e1e2e;
 }
 
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  background: #d0dcff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(180, 198, 255, 0.4);
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
+  background: #bbf7d0; /* 파스텔 그린 */
+  color: #064e3b;
 }
 
 .btn-success:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  background: #dcfce7;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(187, 247, 208, 0.4);
 }
 
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-danger {
+  background: #fecaca; /* 파스텔 레드 */
+  color: #7f1d1d;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fee2e2;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(254, 202, 202, 0.4);
+}
+
+.btn-secondary {
+  background: #e2e8f0; /* 파스텔/밝은 그레이 */
+  color: #1e293b;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f1f5f9;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(226, 232, 240, 0.4);
+}
+
+.btn:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+  transform: none; 
+  box-shadow: none;
+}
 
 /* Table styling */
 .table-wrapper { width: 100%; overflow-x: auto; }

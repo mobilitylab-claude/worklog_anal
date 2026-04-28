@@ -309,8 +309,8 @@ export default function WorklogInput() {
             />
           </div>
 
-          <button onClick={handleSubmit} disabled={loading} className="btn-primary" 
-            style={{ width: "100%", padding: "1rem", fontSize: "1rem", fontWeight: "bold", opacity: loading ? 0.7 : 1 }}>
+          <button onClick={handleSubmit} disabled={loading} className="btn btn-primary" 
+            style={{ width: "100%", padding: "1rem", fontSize: "1rem", fontWeight: "bold" }}>
             {loading ? "Jira에 등록 중..." : "🚀 공수 등록 (Jira 공식 전송)"}
           </button>
         </div>

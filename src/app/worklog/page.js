@@ -62,7 +62,7 @@ export default function WorklogAnalyzer() {
   useEffect(() => {
     fetch("/api/users")
       .then(r => r.json())
-      .then(d => setDbUsers(d.users || []))
+      .then(d => setDbUsers((d.users || []).filter(u => u.is_active !== 0)))
       .catch(e => console.error("사용자 조회 실패:", e));
   }, []);
 
@@ -456,8 +456,7 @@ export default function WorklogAnalyzer() {
           <input type="text" placeholder="제외 키워드 (쉼표 구분)" value={excludeKeyword}
             onChange={e => setExcludeKeyword(e.target.value)}
             style={{ flex: 1, minWidth: "180px", padding: "0.55rem 0.75rem", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "white" }} />
-          <button onClick={handleSearch} disabled={loading} className="btn-primary"
-            style={{ padding: "0.55rem 2rem", fontWeight: "bold", opacity: loading ? 0.6 : 1 }}>
+          <button onClick={handleSearch} disabled={loading} className="btn btn-primary">
             📊 쿼리 실행
           </button>
           <button onClick={async () => {
@@ -483,11 +482,10 @@ export default function WorklogAnalyzer() {
               if (res.ok) alert("✅ 자동 리포트 생성이 등록되었습니다.");
               else alert("등록 실패");
             } catch (e) { alert("오류: " + e.message); }
-          }} className="btn" style={{ padding: "0.55rem 1.25rem", background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#10b981" }}>
+          }} className="btn btn-success">
             ⏰ 스케줄 등록
           </button>
-          <button onClick={handleExport} disabled={worklogs.length === 0} className="btn-success"
-            style={{ padding: "0.55rem 1.25rem" }}>
+          <button onClick={handleExport} disabled={worklogs.length === 0} className="btn btn-secondary">
             📥 엑셀 저장
           </button>
         </div>
