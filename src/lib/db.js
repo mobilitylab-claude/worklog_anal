@@ -1,7 +1,13 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 
-const dbPath = path.resolve(process.cwd(), 'jira_filters.db');
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// src/lib/db.js -> 프로젝트 루트/jira_filters.db (두 단계 위)
+const dbPath = path.resolve(__dirname, '..', '..', 'jira_filters.db');
 const db = new Database(dbPath);
 
 // 앱 구동 시 로컬 sqlite db 초기화 (필터 테이블 생성)

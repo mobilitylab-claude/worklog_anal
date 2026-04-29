@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# 데이터베이스 파일
+*.db
+
 # vercel
 .vercel
 
