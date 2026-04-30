@@ -164,12 +164,47 @@ export default function MonthlyReportsArchive() {
       return { name, totalHours: userMap[name].totalHours, filteredHours: userHours, logs: userLogs };
     }).sort((a, b) => b.totalHours - a.totalHours);
 
+    const issueStatusAnalysis = { overdueEstimate: [], overdueDeadline: [] };
+    const todayStr = new Date().toISOString().split("T")[0];
+    const uniqueIssuesMap = {};
+
+    filteredLogs.forEach(w => {
+      if (!uniqueIssuesMap[w.issueKey]) {
+        uniqueIssuesMap[w.issueKey] = {
+          issueKey: w.issueKey,
+          issueSummary: w.issueSummary,
+          issueStatus: w.issueStatus || "Unknown",
+          author: w.author,
+          originalEstimateSeconds: w.originalEstimateSeconds || 0,
+          issueTimeSpentSeconds: w.issueTimeSpentSeconds || 0,
+          originalEstimateStr: w.originalEstimateStr || "-",
+          issueTimeSpentStr: w.issueTimeSpentStr || "-",
+          dueDate: w.dueDate || "-"
+        };
+      } else {
+        uniqueIssuesMap[w.issueKey].issueTimeSpentSeconds = Math.max(uniqueIssuesMap[w.issueKey].issueTimeSpentSeconds, w.issueTimeSpentSeconds || 0);
+      }
+    });
+
+    Object.values(uniqueIssuesMap).forEach(issue => {
+      const isDone = ["Done", "완료", "Resolved", "Closed", "종료"].includes(issue.issueStatus);
+      if (!isDone) {
+        if (issue.originalEstimateSeconds > 0 && issue.issueTimeSpentSeconds > issue.originalEstimateSeconds) {
+          issueStatusAnalysis.overdueEstimate.push(issue);
+        }
+        if (issue.dueDate !== "-" && issue.dueDate < todayStr) {
+          issueStatusAnalysis.overdueDeadline.push(issue);
+        }
+      }
+    });
+
     return {
       totalHours: totalSec / 3600,
       projectCodeStats: Object.values(pCodeMap).sort((a, b) => b.totalHours - a.totalHours),
       workTypeStats: Object.values(wTypeMap).sort((a, b) => b.totalHours - a.totalHours),
       userStats,
-      filteredLogs
+      filteredLogs,
+      issueStatusAnalysis
     };
   }, [selectedItem, activeFilter]);
 
@@ -240,6 +275,22 @@ export default function MonthlyReportsArchive() {
         return sub;
       });
     });
+  };
+
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      const Y = d.getFullYear();
+      const M = String(d.getMonth() + 1).padStart(2, '0');
+      const D = String(d.getDate()).padStart(2, '0');
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      const s = String(d.getSeconds()).padStart(2, '0');
+      return `${Y}-${M}-${D} ${h}:${m}:${s}`;
+    } catch (e) {
+      return dateStr;
+    }
   };
 
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -400,6 +451,53 @@ export default function MonthlyReportsArchive() {
                   </div>
               </div>
 
+              {/* ── 예상 시간 및 기한 초과 이슈 ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem", marginBottom: "3.5rem" }}>
+                {/* 예상 시간 초과 */}
+                <div className="summary-item" style={{ marginBottom: 0 }}>
+                  <h3 style={{ fontSize: "1rem", color: "var(--text-primary)", fontWeight: "600", marginBottom: "1rem" }}>⏳ 예상 시간 초과 이슈 <span style={{ fontSize: "0.75rem", color: "#f87171" }}>(누적시간 &gt; 예상시간)</span></h3>
+                  <div style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "8px", padding: "1rem", maxHeight: "250px", overflowY: "auto" }}>
+                    {stats?.issueStatusAnalysis?.overdueEstimate?.length > 0 ? (
+                      <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#e5e7eb", fontSize: "0.8rem" }}>
+                        {stats.issueStatusAnalysis.overdueEstimate.map((i, idx) => (
+                          <li key={idx} style={{ marginBottom: "0.5rem" }}>
+                            <span style={{ color: "#60a5fa", fontWeight: "bold" }}>{i.issueKey}</span>
+                            <span style={{ color: "#9ca3af", marginLeft: "0.3rem" }}>{i.issueSummary} ({i.author})</span>
+                            <div style={{ color: "#f87171", fontSize: "0.75rem", marginTop: "0.2rem" }}>
+                              예상: {i.originalEstimateStr} → 기록: {i.issueTimeSpentStr}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ fontSize: "0.8rem", color: "#666", textAlign: "center", padding: "1rem" }}>예상 시간을 초과한 미완료 이슈가 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 기한 초과 */}
+                <div className="summary-item" style={{ marginBottom: 0 }}>
+                  <h3 style={{ fontSize: "1rem", color: "var(--text-primary)", fontWeight: "600", marginBottom: "1rem" }}>🚨 기한 초과 이슈 <span style={{ fontSize: "0.75rem", color: "#f87171" }}>(기한 &lt; 오늘)</span></h3>
+                  <div style={{ background: "rgba(249, 115, 22, 0.05)", border: "1px solid rgba(249, 115, 22, 0.2)", borderRadius: "8px", padding: "1rem", maxHeight: "250px", overflowY: "auto" }}>
+                    {stats?.issueStatusAnalysis?.overdueDeadline?.length > 0 ? (
+                      <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#e5e7eb", fontSize: "0.8rem" }}>
+                        {stats.issueStatusAnalysis.overdueDeadline.map((i, idx) => (
+                          <li key={idx} style={{ marginBottom: "0.5rem" }}>
+                            <span style={{ color: "#60a5fa", fontWeight: "bold" }}>{i.issueKey}</span>
+                            <span style={{ color: "#9ca3af", marginLeft: "0.3rem" }}>{i.issueSummary} ({i.author})</span>
+                            <div style={{ color: "#fb923c", fontSize: "0.75rem", marginTop: "0.2rem" }}>
+                              기한: {i.dueDate} (상태: {i.issueStatus})
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ fontSize: "0.8rem", color: "#666", textAlign: "center", padding: "1rem" }}>기한이 초과된 미완료 이슈가 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* 상세 목록 섹션 */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
                 <h3 style={{ fontSize: "1.1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -420,17 +518,41 @@ export default function MonthlyReportsArchive() {
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: "500px" }}>
                         <thead>
                           <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", textAlign: "left" }}>
-                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "120px" }}>이슈 키</th>
-                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "80px" }}>시간</th>
-                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)" }}>작업 내용 (Comment)</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "130px" }}>이슈키</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "250px" }}>이슈제목</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "80px" }}>시작일</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "80px" }}>기한</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "120px" }}>Est./Rem./Log.</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "150px" }}>작성일시</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)", width: "60px" }}>시간</th>
+                            <th style={{ padding: "0.5rem", color: "var(--text-secondary)" }}>작업 내용</th>
                           </tr>
                         </thead>
                         <tbody>
                           {u.logs.map((log, li) => (
                             <tr key={li} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                              <td style={{ padding: "0.75rem", fontWeight: "bold" }}>{log.issueKey}</td>
-                              <td style={{ padding: "0.75rem" }}>{log.timeSpent || (log.timeSpentSeconds/3600).toFixed(1) + "h"}</td>
-                              <td style={{ padding: "1rem 0.75rem", lineHeight: "1.6", color: "var(--text-secondary)", whiteSpace: "pre-wrap", verticalAlign: "top", wordBreak: "break-word" }}>
+                              <td style={{ padding: "0.75rem", verticalAlign: "top", fontWeight: "bold", color: "var(--accent-color)", fontSize: "0.8rem" }}>
+                                {log.issueKey}
+                              </td>
+                              <td style={{ padding: "0.75rem", verticalAlign: "top", fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
+                                {log.issueSummary}
+                              </td>
+                              <td style={{ padding: "0.75rem", verticalAlign: "top", fontSize: "0.75rem", whiteSpace: "nowrap" }}>
+                                {log.issueStartDate || "-"}
+                              </td>
+                              <td style={{ padding: "0.75rem", verticalAlign: "top", fontSize: "0.75rem", whiteSpace: "nowrap" }}>
+                                {log.dueDate || "-"}
+                              </td>
+                              <td style={{ padding: "0.75rem", verticalAlign: "top", fontSize: "0.7rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                                E: {log.originalEstimate || "-"}<br/>
+                                R: {log.remainingEstimate || "-"}<br/>
+                                L: {log.issueTimeSpent || "-"}
+                              </td>
+                              <td style={{ padding: "0.75rem", verticalAlign: "top", fontSize: "0.75rem", whiteSpace: "nowrap" }}>
+                                {formatDateTime(log.started)}
+                              </td>
+                              <td style={{ padding: "0.75rem", verticalAlign: "top", fontWeight: "bold" }}>{log.timeSpent || (log.timeSpentSeconds/3600).toFixed(1) + "h"}</td>
+                              <td style={{ padding: "1rem 0.75rem", lineHeight: "1.6", color: "var(--text-secondary)", whiteSpace: "pre-wrap", verticalAlign: "top", wordBreak: "break-word", fontSize: "0.8rem" }}>
                                 {linkify(log.comment)}
                               </td>
                             </tr>

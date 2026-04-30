@@ -112,7 +112,7 @@ export async function getWorklogs({
 
   debugLog.push(`[Service] JQL: ${appliedJql}`);
 
-  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project"]);
+  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created"]);
   debugLog.push(`[Service] 이슈 수집 완료: ${allIssues.length}건`);
   
   const allWorklogs = [];
@@ -197,6 +197,8 @@ export async function getWorklogs({
       const secs = w.timeSpentSeconds || 0;
       const hrs = secs / 3600;
 
+      let issueStartDate = issue.fields.created ? issue.fields.created.split("T")[0] : "-";
+
       allWorklogs.push({
         id: w.id,
         issueKey: issue.key,
@@ -210,6 +212,14 @@ export async function getWorklogs({
         timeSpentSeconds: secs,
         timeSpent: Number.isInteger(hrs) ? `${hrs}h` : `${parseFloat(hrs.toFixed(2))}h`,
         comment: commentText || "(작업 내용 미기재)",
+        originalEstimate: issue.fields.timetracking?.originalEstimate || "-",
+        remainingEstimate: issue.fields.timetracking?.remainingEstimate || "-",
+        issueTimeSpent:  issue.fields.timetracking?.timeSpent || "-",
+        originalEstimateSeconds: issue.fields.timetracking?.originalEstimateSeconds || 0,
+        remainingEstimateSeconds: issue.fields.timetracking?.remainingEstimateSeconds || 0,
+        issueTimeSpentSeconds: issue.fields.timetracking?.timeSpentSeconds || 0,
+        issueStartDate:  issueStartDate,
+        dueDate:         issue.fields.duedate || "-",
       });
     }
   }

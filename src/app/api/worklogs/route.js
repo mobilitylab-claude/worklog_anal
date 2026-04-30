@@ -163,7 +163,7 @@ export async function POST(request) {
 
     // ── 2. 이슈 전체 페이지네이션 수집 (공용 클라이언트 사용) ───────────
     debugLog.push("[이슈 수집] 시작 (전체 수집 모드)");
-    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project"]);
+    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created"]);
     debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈 로드 완료`);
 
     // ── 3. 이슈별 워크로그 순차 수집 + 2차 필터 ─────────────────
@@ -272,6 +272,9 @@ export async function POST(request) {
         const hrs       = secs / 3600;
         const timeSpentH = Number.isInteger(hrs) ? `${hrs}h` : `${parseFloat(hrs.toFixed(2))}h`;
 
+        // 이슈 필드 추출
+        let issueStartDate = issue.fields.created ? issue.fields.created.split("T")[0] : "-";
+        
         allWorklogs.push({
           id:              w.id,
           issueKey:        issue.key,
@@ -289,6 +292,16 @@ export async function POST(request) {
           timeSpentRaw:    w.timeSpent,
           timeSpentSeconds: secs,
           comment:         commentText || "(작업 내용 미기재)",
+          
+          // 새로 추가된 필드들 (Estimate, Remaining, Logged, Start date, due date)
+          originalEstimate: issue.fields.timetracking?.originalEstimate || "-",
+          remainingEstimate: issue.fields.timetracking?.remainingEstimate || "-",
+          issueTimeSpent:  issue.fields.timetracking?.timeSpent || "-",
+          originalEstimateSeconds: issue.fields.timetracking?.originalEstimateSeconds || 0,
+          remainingEstimateSeconds: issue.fields.timetracking?.remainingEstimateSeconds || 0,
+          issueTimeSpentSeconds: issue.fields.timetracking?.timeSpentSeconds || 0,
+          issueStartDate:  issueStartDate,
+          dueDate:         issue.fields.duedate || "-",
         });
         keptInIssue++;
       }

@@ -6,11 +6,16 @@ const AVAILABLE_COLUMNS = [
   { id: "started",     label: "작업 일시",      width: "11%" },
   { id: "issueKey",    label: "이슈 번호",      width: "8%"  },
   { id: "issueType",   label: "이슈 유형",      width: "7%"  },
-  { id: "issueSummary",label: "이슈 요약",      width: "20%" },
-  { id: "issueStatus", label: "이슈 상태",      width: "8%"  },
-  { id: "author",      label: "작업자",         width: "9%"  },
+  { id: "issueSummary",label: "이슈 요약",      width: "15%" },
+  { id: "issueStatus", label: "이슈 상태",      width: "6%"  },
+  { id: "issueStartDate", label: "시작일",      width: "7%"  },
+  { id: "dueDate",     label: "기한",           width: "7%"  },
+  { id: "originalEstimate", label: "예상 시간", width: "6%"  },
+  { id: "remainingEstimate", label: "남은 시간", width: "6%"  },
+  { id: "issueTimeSpent", label: "기록된 시간", width: "6%"  },
+  { id: "author",      label: "작업자",         width: "8%"  },
   { id: "timeSpent",   label: "소요시간",       width: "7%"  },
-  { id: "comment",     label: "작업 내용",      width: "30%" },
+  { id: "comment",     label: "작업 내용",      width: "20%" },
 ];
 
 export default function WorklogAnalyzer() {
@@ -53,8 +58,10 @@ export default function WorklogAnalyzer() {
   const progressTimerRef = useRef(null);
 
   // ── UI 제어 ────────────────────────────────────────────────────
-  const [filterAuthor,     setFilterAuthor]     = useState(null);
-  const [showCharts,       setShowCharts]       = useState(true);
+  const [filterAuthor,       setFilterAuthor]       = useState(null);
+  const [filterProjectCode,  setFilterProjectCode]  = useState(null);
+  const [filterWorkType,     setFilterWorkType]     = useState(null);
+  const [showCharts,         setShowCharts]         = useState(true);
   const [showColumnConfig, setShowColumnConfig] = useState(false);
   const [visibleColumns,   setVisibleColumns]   = useState(AVAILABLE_COLUMNS.map(c => c.id));
 
@@ -151,6 +158,8 @@ export default function WorklogAnalyzer() {
     setWorklogs([]);
     setDebugLog([]);
     setFilterAuthor(null);
+    setFilterProjectCode(null);
+    setFilterWorkType(null);
     startProgress();
 
     try {
@@ -207,6 +216,11 @@ export default function WorklogAnalyzer() {
         if (visibleColumns.includes("issueType"))    row["이슈 유형"]  = w.issueType;
         if (visibleColumns.includes("issueSummary")) row["이슈 요약"]  = w.issueSummary;
         if (visibleColumns.includes("issueStatus"))  row["이슈 상태"]  = w.issueStatus;
+        if (visibleColumns.includes("issueStartDate")) row["시작일"] = w.issueStartDate;
+        if (visibleColumns.includes("dueDate"))      row["기한"]       = w.dueDate;
+        if (visibleColumns.includes("originalEstimate")) row["예상 시간"] = w.originalEstimate;
+        if (visibleColumns.includes("remainingEstimate")) row["남은 시간"] = w.remainingEstimate;
+        if (visibleColumns.includes("issueTimeSpent")) row["기록된 시간"] = w.issueTimeSpent;
         if (visibleColumns.includes("author"))       row["작업자"]     = w.author;
         if (visibleColumns.includes("timeSpent"))    row["소요 시간(h)"]  = w.timeSpent;
         if (visibleColumns.includes("timeSpent"))    row["원본 시간"]     = w.timeSpentRaw || w.timeSpent;
@@ -299,10 +313,81 @@ export default function WorklogAnalyzer() {
     return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: (v / 3600).toFixed(1) }));
   }, [worklogs, targetMode, selectedUsers, dbUsers]);
 
-  const filteredWorklogs = useMemo(() =>
-    filterAuthor ? worklogs.filter(w => w.author === filterAuthor) : worklogs,
-    [worklogs, filterAuthor]
-  );
+  const statsByProjectCode = useMemo(() => {
+    const map = {};
+    worklogs.forEach(w => {
+      const pc = w.projectCode || "미지정";
+      map[pc] = (map[pc] || 0) + (w.timeSpentSeconds || 0);
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: (v / 3600).toFixed(1) }));
+  }, [worklogs]);
+
+  const statsByWorkType = useMemo(() => {
+    const map = {};
+    worklogs.forEach(w => {
+      const wt = w.workType || "기타";
+      map[wt] = (map[wt] || 0) + (w.timeSpentSeconds || 0);
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: (v / 3600).toFixed(1) }));
+  }, [worklogs]);
+
+  const issueStatusAnalysis = useMemo(() => {
+    const issuesMap = {};
+    worklogs.forEach(w => {
+      if (!issuesMap[w.issueKey]) {
+        issuesMap[w.issueKey] = {
+          issueKey: w.issueKey,
+          issueSummary: w.issueSummary,
+          author: w.author,
+          originalEstimate: w.originalEstimateSeconds || 0,
+          remainingEstimate: w.remainingEstimateSeconds || 0,
+          issueTimeSpent: w.issueTimeSpentSeconds || 0,
+          originalEstimateStr: w.originalEstimate,
+          issueTimeSpentStr: w.issueTimeSpent,
+          dueDate: w.dueDate,
+          issueStatus: w.issueStatus
+        };
+      }
+    });
+
+    const issues = Object.values(issuesMap);
+    const now = new Date();
+    // Exclude resolved issues for overdue checks
+    const isDone = (status) => {
+      if (!status) return false;
+      const s = status.toLowerCase();
+      return s.includes("완료") || s.includes("done") || s.includes("resolved") || s.includes("closed") || s.includes("종료");
+    };
+
+    const overdueDeadline = issues.filter(i => {
+      if (!i.dueDate || i.dueDate === "-") return false;
+      if (isDone(i.issueStatus)) return false;
+      const dueDate = new Date(i.dueDate);
+      // Compare without time
+      now.setHours(0, 0, 0, 0);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < now;
+    });
+
+    const overdueEstimate = issues.filter(i => {
+      if (isDone(i.issueStatus)) return false; 
+      // originalEstimate must be set and issueTimeSpent > originalEstimate
+      return i.originalEstimate > 0 && i.issueTimeSpent > i.originalEstimate;
+    });
+
+    return {
+      overdueDeadline,
+      overdueEstimate
+    };
+  }, [worklogs]);
+
+  const filteredWorklogs = useMemo(() => {
+    let result = worklogs;
+    if (filterAuthor) result = result.filter(w => w.author === filterAuthor);
+    if (filterProjectCode) result = result.filter(w => (w.projectCode || "미지정") === filterProjectCode);
+    if (filterWorkType) result = result.filter(w => (w.workType || "기타") === filterWorkType);
+    return result;
+  }, [worklogs, filterAuthor, filterProjectCode, filterWorkType]);
 
   const filteredTotalHours = useMemo(() =>
     (filteredWorklogs.reduce((a, c) => a + (c.timeSpentSeconds || 0), 0) / 3600).toFixed(1),
@@ -529,236 +614,338 @@ export default function WorklogAnalyzer() {
             </button>
           </div>
           {showCharts && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
+                {/* ── 월별 실적: 세로 막대 + 추이선 ── */}
+                <div>
+                  <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "1rem" }}>📅 월별 실적</h3>
+                  {(() => {
+                    const BAR_W = 44;
+                    const GAP   = 16;
+                    const H     = 200;
+                    const PAD_L = 44;
+                    const PAD_B = 36;
+                    const PAD_T = 20;
+                    const n     = statsByMonth.length;
+                    const W     = PAD_L + n * BAR_W + (n - 1) * GAP + 24;
+                    const maxVal = Math.max(...statsByMonth.map(x => parseFloat(x.value)), 1);
+                    // 눈금선 개수
+                    const gridLines = 4;
 
-              {/* ── 월별 실적: 세로 막대 + 추이선 ── */}
-              <div>
-                <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "1rem" }}>📅 월별 실적</h3>
-                {(() => {
-                  const BAR_W = 44;
-                  const GAP   = 16;
-                  const H     = 200;
-                  const PAD_L = 44;
-                  const PAD_B = 36;
-                  const PAD_T = 20;
-                  const n     = statsByMonth.length;
-                  const W     = PAD_L + n * BAR_W + (n - 1) * GAP + 24;
-                  const maxVal = Math.max(...statsByMonth.map(x => parseFloat(x.value)), 1);
-                  // 눈금선 개수
-                  const gridLines = 4;
+                    // 각 막대 x 중심
+                    const barCx = (i) => PAD_L + i * (BAR_W + GAP) + BAR_W / 2;
+                    const barH  = (v) => ((v / maxVal) * (H - PAD_T - PAD_B));
+                    const barY  = (v) => H - PAD_B - barH(v);
 
-                  // 각 막대 x 중심
-                  const barCx = (i) => PAD_L + i * (BAR_W + GAP) + BAR_W / 2;
-                  const barH  = (v) => ((v / maxVal) * (H - PAD_T - PAD_B));
-                  const barY  = (v) => H - PAD_B - barH(v);
+                    // 추이선 포인트
+                    const points = statsByMonth.map((s, i) =>
+                      `${barCx(i)},${barY(parseFloat(s.value))}`
+                    ).join(" ");
 
-                  // 추이선 포인트
-                  const points = statsByMonth.map((s, i) =>
-                    `${barCx(i)},${barY(parseFloat(s.value))}`
-                  ).join(" ");
+                    return (
+                      <div style={{ width: "100%" }}>
+                        <svg viewBox={`0 0 ${Math.max(W, 280)} ${H}`} width="100%" height={H} style={{ display: "block" }}>
+                          {/* 눈금선 */}
+                          {Array.from({ length: gridLines + 1 }, (_, gi) => {
+                            const yVal = (maxVal / gridLines) * gi;
+                            const yPos = H - PAD_B - (yVal / maxVal) * (H - PAD_T - PAD_B);
+                            return (
+                              <g key={gi}>
+                                <line x1={PAD_L - 6} y1={yPos} x2={W} y2={yPos}
+                                  stroke="#1e1e2e" strokeWidth="1" />
+                                <text x={PAD_L - 8} y={yPos + 4} textAnchor="end"
+                                  fontSize="10" fill="#555">
+                                  {yVal.toFixed(2)}
+                                </text>
+                              </g>
+                            );
+                          })}
 
-                  return (
-                    <div style={{ width: "100%" }}>
-                      <svg viewBox={`0 0 ${Math.max(W, 280)} ${H}`} width="100%" height={H} style={{ display: "block" }}>
-                        {/* 눈금선 */}
-                        {Array.from({ length: gridLines + 1 }, (_, gi) => {
-                          const yVal = (maxVal / gridLines) * gi;
-                          const yPos = H - PAD_B - (yVal / maxVal) * (H - PAD_T - PAD_B);
-                          return (
-                            <g key={gi}>
-                              <line x1={PAD_L - 6} y1={yPos} x2={W} y2={yPos}
-                                stroke="#1e1e2e" strokeWidth="1" />
-                              <text x={PAD_L - 8} y={yPos + 4} textAnchor="end"
-                                fontSize="10" fill="#555">
-                                {yVal.toFixed(2)}
-                              </text>
-                            </g>
-                          );
-                        })}
+                          {/* Y축 라벨 */}
+                          <text x={8} y={H / 2} textAnchor="middle" fontSize="10" fill="#555"
+                            transform={`rotate(-90,8,${H / 2})`}>MM</text>
 
-                        {/* Y축 라벨 */}
-                        <text x={8} y={H / 2} textAnchor="middle" fontSize="10" fill="#555"
-                          transform={`rotate(-90,8,${H / 2})`}>MM</text>
+                          {/* 막대 */}
+                          {statsByMonth.map((s, i) => {
+                            const val  = parseFloat(s.value);
+                            const bh   = barH(val);
+                            const bx   = PAD_L + i * (BAR_W + GAP);
+                            const by   = barY(val);
+                            return (
+                              <g key={s.label}>
+                                {/* 막대 그라데이션 */}
+                                <defs>
+                                  <linearGradient id={`mg${i}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.9" />
+                                    <stop offset="100%" stopColor="#1d4ed8" stopOpacity="0.7" />
+                                  </linearGradient>
+                                </defs>
+                                <rect x={bx} y={by} width={BAR_W} height={bh}
+                                  fill={`url(#mg${i})`} rx="4" ry="4">
+                                  <title>{s.label}: {val} MM ({s.hours}h)</title>
+                                </rect>
+                                {/* 막대 위 수치 */}
+                                <text x={bx + BAR_W / 2} y={by - 4} textAnchor="middle"
+                                  fontSize="10" fill="#60a5fa" fontWeight="bold">
+                                  {val} MM
+                                </text>
+                                {/* X축 레이블 */}
+                                <text x={bx + BAR_W / 2} y={H - PAD_B + 14} textAnchor="middle"
+                                  fontSize="10" fill="#888">
+                                  {s.label.substring(5)}월
+                                </text>
+                                <text x={bx + BAR_W / 2} y={H - PAD_B + 26} textAnchor="middle"
+                                  fontSize="9" fill="#555">
+                                  {s.label.substring(0, 4)}
+                                </text>
+                              </g>
+                            );
+                          })}
 
-                        {/* 막대 */}
-                        {statsByMonth.map((s, i) => {
-                          const val  = parseFloat(s.value);
-                          const bh   = barH(val);
-                          const bx   = PAD_L + i * (BAR_W + GAP);
-                          const by   = barY(val);
-                          return (
-                            <g key={s.label}>
-                              {/* 막대 그라데이션 */}
+                          {/* 추이선 */}
+                          {n >= 2 && (
+                            <>
                               <defs>
-                                <linearGradient id={`mg${i}`} x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.9" />
-                                  <stop offset="100%" stopColor="#1d4ed8" stopOpacity="0.7" />
-                                </linearGradient>
+                                <filter id="glow">
+                                  <feGaussianBlur stdDeviation="2" result="blur" />
+                                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                </filter>
                               </defs>
-                              <rect x={bx} y={by} width={BAR_W} height={bh}
-                                fill={`url(#mg${i})`} rx="4" ry="4">
-                                <title>{s.label}: {val} MM ({s.hours}h)</title>
-                              </rect>
-                              {/* 막대 위 수치 */}
-                              <text x={bx + BAR_W / 2} y={by - 4} textAnchor="middle"
-                                fontSize="10" fill="#60a5fa" fontWeight="bold">
-                                {val} MM
-                              </text>
-                              {/* X축 레이블 */}
-                              <text x={bx + BAR_W / 2} y={H - PAD_B + 14} textAnchor="middle"
-                                fontSize="10" fill="#888">
-                                {s.label.substring(5)}월
-                              </text>
-                              <text x={bx + BAR_W / 2} y={H - PAD_B + 26} textAnchor="middle"
-                                fontSize="9" fill="#555">
-                                {s.label.substring(0, 4)}
-                              </text>
-                            </g>
+                              <polyline
+                                points={points}
+                                fill="none"
+                                stroke="rgba(16,185,129,0.35)"
+                                strokeWidth="2"
+                                strokeDasharray="4 3"
+                              />
+                              <polyline
+                                points={points}
+                                fill="none"
+                                stroke="#10b981"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                filter="url(#glow)"
+                              />
+                              {statsByMonth.map((s, i) => (
+                                <circle key={s.label}
+                                  cx={barCx(i)} cy={barY(parseFloat(s.value))} r="4"
+                                  fill="#10b981" stroke="#0a0a12" strokeWidth="2" />
+                              ))}
+                            </>
+                          )}
+                        </svg>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* ── 작업자별 실적: 카드 그리드 ── */}
+                <div>
+                  <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "0.75rem" }}>
+                    👤 작업자별 실적
+                    <span style={{ marginLeft: "0.75rem", fontSize: "0.75rem", color: "#555" }}>
+                      (<span style={{ color: "#f97316" }}>●</span> 8h 미만)
+                    </span>
+                  </h3>
+                  {(() => {
+                    const maxVal = Math.max(...statsByUser.map(x => parseFloat(x.value)), 1);
+                    const THRESHOLD = 8; // 8시간 기준
+                    return (
+                      <div style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "0.65rem",
+                      }}>
+                        {statsByUser.map(s => {
+                          const val    = parseFloat(s.value);
+                          const active = filterAuthor === s.label;
+                          const under  = val < THRESHOLD;
+                          const pct    = (val / maxVal) * 100;
+
+                          // 색상 팔레트
+                          const barColor   = under ? (val < 4 ? "#ef4444" : "#f97316") : "#10b981";
+                          const glowColor  = under ? (val < 4 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)") : "rgba(16,185,129,0.15)";
+                          const textColor  = under ? (val < 4 ? "#f87171" : "#fb923c") : "#34d399";
+                          const borderClr  = active
+                            ? "var(--accent-color)"
+                            : under
+                              ? (val < 4 ? "rgba(239,68,68,0.5)" : "rgba(249,115,22,0.4)")
+                              : "transparent";
+                          const bgColor    = active
+                            ? "rgba(59,130,246,0.15)"
+                            : under
+                              ? (val < 4 ? "rgba(239,68,68,0.07)" : "rgba(249,115,22,0.07)")
+                              : "rgba(255,255,255,0.03)";
+
+                          return (
+                            <div key={s.label}
+                              onClick={() => setFilterAuthor(active ? null : s.label)}
+                              title={`${s.label}: ${val}h${under ? " ⚠️ 8시간 미만" : ""}`}
+                              style={{
+                                cursor: "pointer",
+                                flex: "1 1 140px", // 최소 140px, 공간 있으면 확장
+                                maxWidth: "200px", // 너무 커지는 것 방지
+                                padding: "0.65rem 0.75rem",
+                                borderRadius: "10px",
+                                border: `1px solid ${borderClr}`,
+                                background: bgColor,
+                                boxShadow: active ? `0 0 12px ${glowColor}` : under ? `0 0 8px ${glowColor}` : "none",
+                                transition: "all 0.2s",
+                              }}
+                            >
+                              {/* 이름 */}
+                              <div style={{
+                                fontSize: "0.78rem",
+                                fontWeight: "bold",
+                                color: active ? "white" : under ? textColor : "#ccc",
+                                marginBottom: "0.35rem",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}>
+                                {active ? "✅ " : under ? "⚠️ " : ""}{s.label}
+                              </div>
+
+                              {/* 시간 수치 */}
+                              <div style={{
+                                fontSize: "1.05rem",
+                                fontWeight: "bold",
+                                color: textColor,
+                                marginBottom: "0.4rem",
+                                lineHeight: 1,
+                              }}>
+                                {val}h
+                              </div>
+
+                              {/* 미니 바 */}
+                              <div style={{ height: "4px", background: "#1a1a2e", borderRadius: "2px" }}>
+                                <div style={{
+                                  width: `${pct}%`,
+                                  height: "100%",
+                                  background: barColor,
+                                  borderRadius: "2px",
+                                  transition: "width 0.6s",
+                                }} />
+                              </div>
+
+                              {/* 8h 기준 표시 */}
+                              {under && (
+                                <div style={{ fontSize: "0.68rem", color: textColor, marginTop: "0.3rem", opacity: 0.85 }}>
+                                  {(THRESHOLD - val).toFixed(1)}h 부족
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
+                      </div>
+                    );
+                  })()}
+                </div>
 
-                        {/* 추이선 */}
-                        {n >= 2 && (
-                          <>
-                            <defs>
-                              <filter id="glow">
-                                <feGaussianBlur stdDeviation="2" result="blur" />
-                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                              </filter>
-                            </defs>
-                            <polyline
-                              points={points}
-                              fill="none"
-                              stroke="rgba(16,185,129,0.35)"
-                              strokeWidth="2"
-                              strokeDasharray="4 3"
-                            />
-                            <polyline
-                              points={points}
-                              fill="none"
-                              stroke="#10b981"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              filter="url(#glow)"
-                            />
-                            {statsByMonth.map((s, i) => (
-                              <circle key={s.label}
-                                cx={barCx(i)} cy={barY(parseFloat(s.value))} r="4"
-                                fill="#10b981" stroke="#0a0a12" strokeWidth="2" />
-                            ))}
-                          </>
-                        )}
-                      </svg>
-                    </div>
-                  );
-                })()}
               </div>
 
-              {/* ── 작업자별 실적: 카드 그리드 ── */}
-              <div>
-                <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "0.75rem" }}>
-                  👤 작업자별 실적
-                  <span style={{ marginLeft: "0.75rem", fontSize: "0.75rem", color: "#555" }}>
-                    (<span style={{ color: "#f97316" }}>●</span> 8h 미만)
-                  </span>
-                </h3>
-                {(() => {
-                  const maxVal = Math.max(...statsByUser.map(x => parseFloat(x.value)), 1);
-                  const THRESHOLD = 8; // 8시간 기준
-                  return (
-                    <div style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "0.65rem",
-                    }}>
-                      {statsByUser.map(s => {
-                        const val    = parseFloat(s.value);
-                        const active = filterAuthor === s.label;
-                        const under  = val < THRESHOLD;
-                        const pct    = (val / maxVal) * 100;
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginTop: "2rem" }}>
+                {/* 프로젝트 코드별 */}
+                <div>
+                  <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "0.75rem" }}>🏷️ 프로젝트 코드별 실적</h3>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                    {statsByProjectCode.map(s => {
+                      const active = filterProjectCode === s.label;
+                      return (
+                      <div key={s.label} 
+                        onClick={() => setFilterProjectCode(active ? null : s.label)}
+                        style={{ 
+                          background: active ? "rgba(16, 185, 129, 0.15)" : "rgba(255,255,255,0.03)", 
+                          border: active ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.05)", 
+                          borderRadius: "8px", padding: "0.5rem 0.8rem", display: "flex", gap: "0.5rem", alignItems: "center", cursor: "pointer",
+                          boxShadow: active ? "0 0 8px rgba(16, 185, 129, 0.2)" : "none",
+                          transition: "all 0.2s"
+                        }}>
+                        <span style={{ fontSize: "0.8rem", color: active ? "white" : "#ccc", fontWeight: active ? "bold" : "normal" }}>
+                          {active ? "✅ " : ""}{s.label}
+                        </span>
+                        <span style={{ fontSize: "0.9rem", color: "#10b981", fontWeight: "bold" }}>{s.value}h</span>
+                      </div>
+                    )})}
+                    {statsByProjectCode.length === 0 && <div style={{ fontSize: "0.8rem", color: "#666" }}>데이터 없음</div>}
+                  </div>
+                </div>
 
-                        // 색상 팔레트
-                        const barColor   = under ? (val < 4 ? "#ef4444" : "#f97316") : "#10b981";
-                        const glowColor  = under ? (val < 4 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)") : "rgba(16,185,129,0.15)";
-                        const textColor  = under ? (val < 4 ? "#f87171" : "#fb923c") : "#34d399";
-                        const borderClr  = active
-                          ? "var(--accent-color)"
-                          : under
-                            ? (val < 4 ? "rgba(239,68,68,0.5)" : "rgba(249,115,22,0.4)")
-                            : "transparent";
-                        const bgColor    = active
-                          ? "rgba(59,130,246,0.15)"
-                          : under
-                            ? (val < 4 ? "rgba(239,68,68,0.07)" : "rgba(249,115,22,0.07)")
-                            : "rgba(255,255,255,0.03)";
-
-                        return (
-                          <div key={s.label}
-                            onClick={() => setFilterAuthor(active ? null : s.label)}
-                            title={`${s.label}: ${val}h${under ? " ⚠️ 8시간 미만" : ""}`}
-                            style={{
-                              cursor: "pointer",
-                              flex: "1 1 140px", // 최소 140px, 공간 있으면 확장
-                              maxWidth: "200px", // 너무 커지는 것 방지
-                              padding: "0.65rem 0.75rem",
-                              borderRadius: "10px",
-                              border: `1px solid ${borderClr}`,
-                              background: bgColor,
-                              boxShadow: active ? `0 0 12px ${glowColor}` : under ? `0 0 8px ${glowColor}` : "none",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            {/* 이름 */}
-                            <div style={{
-                              fontSize: "0.78rem",
-                              fontWeight: "bold",
-                              color: active ? "white" : under ? textColor : "#ccc",
-                              marginBottom: "0.35rem",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}>
-                              {active ? "✅ " : under ? "⚠️ " : ""}{s.label}
-                            </div>
-
-                            {/* 시간 수치 */}
-                            <div style={{
-                              fontSize: "1.05rem",
-                              fontWeight: "bold",
-                              color: textColor,
-                              marginBottom: "0.4rem",
-                              lineHeight: 1,
-                            }}>
-                              {val}h
-                            </div>
-
-                            {/* 미니 바 */}
-                            <div style={{ height: "4px", background: "#1a1a2e", borderRadius: "2px" }}>
-                              <div style={{
-                                width: `${pct}%`,
-                                height: "100%",
-                                background: barColor,
-                                borderRadius: "2px",
-                                transition: "width 0.6s",
-                              }} />
-                            </div>
-
-                            {/* 8h 기준 표시 */}
-                            {under && (
-                              <div style={{ fontSize: "0.68rem", color: textColor, marginTop: "0.3rem", opacity: 0.85 }}>
-                                {(THRESHOLD - val).toFixed(1)}h 부족
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                {/* 작업 유형별 */}
+                <div>
+                  <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "0.75rem" }}>🛠️ 작업 유형별 실적</h3>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                    {statsByWorkType.map(s => {
+                      const active = filterWorkType === s.label;
+                      return (
+                      <div key={s.label} 
+                        onClick={() => setFilterWorkType(active ? null : s.label)}
+                        style={{ 
+                          background: active ? "rgba(59, 130, 246, 0.15)" : "rgba(255,255,255,0.03)", 
+                          border: active ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.05)", 
+                          borderRadius: "8px", padding: "0.5rem 0.8rem", display: "flex", gap: "0.5rem", alignItems: "center", cursor: "pointer",
+                          boxShadow: active ? "0 0 8px rgba(59, 130, 246, 0.2)" : "none",
+                          transition: "all 0.2s"
+                        }}>
+                        <span style={{ fontSize: "0.8rem", color: active ? "white" : "#ccc", fontWeight: active ? "bold" : "normal" }}>
+                          {active ? "✅ " : ""}{s.label}
+                        </span>
+                        <span style={{ fontSize: "0.9rem", color: "#3b82f6", fontWeight: "bold" }}>{s.value}h</span>
+                      </div>
+                    )})}
+                    {statsByWorkType.length === 0 && <div style={{ fontSize: "0.8rem", color: "#666" }}>데이터 없음</div>}
+                  </div>
+                </div>
               </div>
 
-            </div>
+              {/* ── 예상 시간 및 기한 초과 이슈 ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginTop: "2rem" }}>
+                {/* 예상 시간 초과 */}
+                <div>
+                  <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "0.75rem" }}>⏳ 예상 시간 초과 이슈 <span style={{ fontSize: "0.75rem", color: "#f87171" }}>(누적시간 &gt; 예상시간)</span></h3>
+                  <div style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "8px", padding: "1rem", maxHeight: "250px", overflowY: "auto" }}>
+                    {issueStatusAnalysis.overdueEstimate.length > 0 ? (
+                      <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#e5e7eb", fontSize: "0.8rem" }}>
+                        {issueStatusAnalysis.overdueEstimate.map((i, idx) => (
+                          <li key={idx} style={{ marginBottom: "0.5rem" }}>
+                            <a href={`${jiraHost}/browse/${i.issueKey}`} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", fontWeight: "bold" }}>{i.issueKey}</a>
+                            <span style={{ color: "#9ca3af", marginLeft: "0.3rem" }}>{i.issueSummary} ({i.author})</span>
+                            <div style={{ color: "#f87171", fontSize: "0.75rem", marginTop: "0.2rem" }}>
+                              예상: {i.originalEstimateStr} → 기록: {i.issueTimeSpentStr}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ fontSize: "0.8rem", color: "#666", textAlign: "center", padding: "1rem" }}>예상 시간을 초과한 미완료 이슈가 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 기한 초과 */}
+                <div>
+                  <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "0.75rem" }}>🚨 기한 초과 이슈 <span style={{ fontSize: "0.75rem", color: "#f87171" }}>(기한 &lt; 오늘)</span></h3>
+                  <div style={{ background: "rgba(249, 115, 22, 0.05)", border: "1px solid rgba(249, 115, 22, 0.2)", borderRadius: "8px", padding: "1rem", maxHeight: "250px", overflowY: "auto" }}>
+                    {issueStatusAnalysis.overdueDeadline.length > 0 ? (
+                      <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#e5e7eb", fontSize: "0.8rem" }}>
+                        {issueStatusAnalysis.overdueDeadline.map((i, idx) => (
+                          <li key={idx} style={{ marginBottom: "0.5rem" }}>
+                            <a href={`${jiraHost}/browse/${i.issueKey}`} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", fontWeight: "bold" }}>{i.issueKey}</a>
+                            <span style={{ color: "#9ca3af", marginLeft: "0.3rem" }}>{i.issueSummary} ({i.author})</span>
+                            <div style={{ color: "#fb923c", fontSize: "0.75rem", marginTop: "0.2rem" }}>
+                              기한: {i.dueDate} (상태: {i.issueStatus})
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ fontSize: "0.8rem", color: "#666", textAlign: "center", padding: "1rem" }}>기한이 초과된 미완료 이슈가 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -775,10 +962,10 @@ export default function WorklogAnalyzer() {
               <span style={{ background: "rgba(16,185,129,0.12)", border: "1px solid #10b981", padding: "2px 10px", borderRadius: "14px", fontSize: "0.82rem", fontWeight: "bold", color: "#10b981" }}>
                 {filteredTotalHours}h
               </span>
-              {filterAuthor && (
-                <span style={{ color: "#fbbf24", fontSize: "0.82rem" }}>
-                  🔍 {filterAuthor}
-                  <button onClick={() => setFilterAuthor(null)} style={{ marginLeft: "0.4rem", background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "0.75rem", textDecoration: "underline" }}>해제</button>
+              {(filterAuthor || filterProjectCode || filterWorkType) && (
+                <span style={{ color: "#fbbf24", fontSize: "0.82rem", display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                  🔍 필터 적용됨: {[filterAuthor, filterProjectCode, filterWorkType].filter(Boolean).join(", ")}
+                  <button onClick={() => { setFilterAuthor(null); setFilterProjectCode(null); setFilterWorkType(null); }} style={{ marginLeft: "0.4rem", background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "0.75rem", textDecoration: "underline" }}>해제</button>
                 </span>
               )}
             </div>
@@ -823,6 +1010,11 @@ export default function WorklogAnalyzer() {
                     {visibleColumns.includes("issueType")    && <td>{w.issueType}</td>}
                     {visibleColumns.includes("issueSummary") && <td style={{ fontSize: "0.8rem" }}>{w.issueSummary}</td>}
                     {visibleColumns.includes("issueStatus")  && <td>{w.issueStatus}</td>}
+                    {visibleColumns.includes("issueStartDate") && <td>{w.issueStartDate}</td>}
+                    {visibleColumns.includes("dueDate")        && <td>{w.dueDate}</td>}
+                    {visibleColumns.includes("originalEstimate") && <td>{w.originalEstimate}</td>}
+                    {visibleColumns.includes("remainingEstimate") && <td>{w.remainingEstimate}</td>}
+                    {visibleColumns.includes("issueTimeSpent") && <td>{w.issueTimeSpent}</td>}
                     {visibleColumns.includes("author")       && <td style={{ fontWeight: "bold" }}>{w.author}</td>}
                     {visibleColumns.includes("timeSpent")    && <td style={{ color: "#10b981", whiteSpace: "nowrap", fontWeight: "bold" }}>
                       {w.timeSpent}
