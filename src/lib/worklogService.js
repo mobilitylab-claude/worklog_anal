@@ -203,6 +203,8 @@ export async function getWorklogs({
         id: w.id,
         issueKey: issue.key,
         issueSummary: issue.fields.summary,
+        issueType: issue.fields.issuetype?.name || "-",
+        issueStatus: issue.fields.status?.name || "-",
         projectKey: issue.fields.project?.key || "-",
         projectName: issue.fields.project?.name || "-",
         projectCode: parsedProjectCode || "",

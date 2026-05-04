@@ -31,8 +31,11 @@ export default function WorklogInput() {
       const pData = await pRes.json();
       const tData = await tRes.json();
       
-      const projs = pData.projects || [];
+      const projsRaw = pData.projects || [];
       const types = tData.types || [];
+      
+      const todayStr = new Date().toISOString().split("T")[0];
+      const projs = projsRaw.filter(p => !p.end_date || p.end_date >= todayStr);
       
       setProjectCodes(projs);
       setWorkTypes(types);
@@ -81,7 +84,12 @@ export default function WorklogInput() {
   // 형식: 계약과제 코드 / 분류 키워드 / 작업 내용 (대괄호 및 이슈번호 제외)
   const finalComment = useMemo(() => {
     const prefix = `${projectCode} / ${selectedKw || "키워드"} / `;
-    return `${prefix}${comment}`;
+    
+    // URL을 Jira Wiki 형식의 링크로 변환 ([url])
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const formattedComment = comment.replace(urlRegex, '[$1]');
+    
+    return `${prefix}${formattedComment}`;
   }, [projectCode, selectedKw, comment]);
 
   // ── 최근 이슈 로드 (분석 기능을 통해 간접적으로 가져옴) ──────────
@@ -102,10 +110,19 @@ export default function WorklogInput() {
       if (data.worklogs) {
         const logs = data.worklogs;
         
+        const jiraHost = data.jiraHost || "";
+
         // 1. 오늘 총 시간 계산
         const todayLogs = logs.filter(l => l.started.startsWith(todayStr));
         const todayHrs = todayLogs.reduce((sum, l) => sum + (l.timeSpentSeconds || 0), 0) / 3600;
         setTodayTotal(todayHrs);
+
+        // 완료 상태 체크 함수
+        const isDone = (status) => {
+          if (!status) return false;
+          const s = status.toLowerCase();
+          return s.includes("완료") || s.includes("done") || s.includes("resolved") || s.includes("closed") || s.includes("종료");
+        };
 
         // 2. 최근 이슈별 요약 및 누적 시간 계산
         const issueMap = {};
@@ -114,14 +131,19 @@ export default function WorklogInput() {
             issueMap[l.issueKey] = { 
               key: l.issueKey, 
               summary: l.issueSummary, 
-              totalSeconds: 0 
+              totalSeconds: 0,
+              issueStatus: l.issueStatus,
+              link: jiraHost ? `${jiraHost}/browse/${l.issueKey}` : ""
             };
           }
           issueMap[l.issueKey].totalSeconds += (l.timeSpentSeconds || 0);
         });
 
+        // 완료된 이슈 제외
+        const activeIssueKeys = Object.keys(issueMap).filter(key => !isDone(issueMap[key].issueStatus));
+
         // 최근 작업 순으로 정렬 (가장 최근 로그가 있는 이슈가 위로)
-        const sortedKeys = Array.from(new Set(logs.map(l => l.issueKey))).slice(0, 10);
+        const sortedKeys = Array.from(new Set(logs.map(l => l.issueKey))).filter(key => activeIssueKeys.includes(key)).slice(0, 10);
         const processedIssues = sortedKeys.map(key => ({
           ...issueMap[key],
           totalHours: (issueMap[key].totalSeconds / 3600).toFixed(1)
@@ -219,7 +241,15 @@ export default function WorklogInput() {
               return (
                 <div style={{ marginTop: "0.75rem", padding: "0.8rem", background: "rgba(59,130,246,0.08)", borderRadius: "8px", borderLeft: "4px solid var(--accent-color)" }}>
                   <div style={{ fontSize: "0.85rem", color: "white", fontWeight: "bold", marginBottom: "0.2rem" }}>
-                    {selected ? selected.summary : "이슈 상세 정보를 불러올 수 없습니다."}
+                    {selected ? (
+                      selected.link ? (
+                        <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none" }}>
+                          {selected.summary} <span style={{ fontSize: "0.7rem", color: "var(--accent-color)" }}>🔗</span>
+                        </a>
+                      ) : (
+                        selected.summary
+                      )
+                    ) : "이슈 상세 정보를 불러올 수 없습니다."}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
                     {selected && `🕒 최근 30일 누적 공수: ${selected.totalHours}h`}
@@ -319,7 +349,7 @@ export default function WorklogInput() {
         <div>
           <div className="card" style={{ marginBottom: "1.5rem", background: "rgba(59,130,246,0.05)" }}>
             <h3 style={{ fontSize: "0.9rem", color: "var(--accent-color)", marginBottom: "1rem" }}>📋 실시간 포맷 검수</h3>
-            <div style={{ fontSize: "0.82rem", background: "#050508", padding: "1rem", borderRadius: "8px", border: "1px dashed #2a2a3a", color: "#aaa", fontFamily: "monospace", wordBreak: "break-all" }}>
+            <div style={{ fontSize: "0.82rem", background: "#050508", padding: "1rem", borderRadius: "8px", border: "1px dashed #2a2a3a", color: "#aaa", fontFamily: "monospace", wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
               <div style={{ marginBottom: "0.4rem", color: "#555" }}>Jira 공수 로그 코멘트:</div>
               <span style={{ color: "#34d399" }}>{finalComment}</span>
             </div>

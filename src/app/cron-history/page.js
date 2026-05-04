@@ -144,8 +144,8 @@ export default function CronHistory() {
           author: w.author,
           originalEstimateSeconds: w.originalEstimateSeconds || 0,
           issueTimeSpentSeconds: w.issueTimeSpentSeconds || 0,
-          originalEstimateStr: w.originalEstimateStr || "-",
-          issueTimeSpentStr: w.issueTimeSpentStr || "-",
+          originalEstimateStr: w.originalEstimate || "-",
+          issueTimeSpentStr: w.issueTimeSpent || "-",
           dueDate: w.dueDate || "-"
         };
       } else {
