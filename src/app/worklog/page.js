@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import { getJiraAuthHeaders } from "@/lib/jiraAuthClient";
 
 const AVAILABLE_COLUMNS = [
   { id: "started",     label: "작업 일시",      width: "11%" },
@@ -172,7 +173,7 @@ export default function WorklogAnalyzer() {
 
       const res = await fetch("/api/worklogs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getJiraAuthHeaders() },
         body: JSON.stringify({
           startDate,
           endDate,

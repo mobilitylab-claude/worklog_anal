@@ -27,8 +27,9 @@ export async function POST(request) {
   try {
     const { issueKey, started, timeSpentSeconds, comment } = await request.json();
 
+    const xJiraToken = request.headers.get("x-jira-token");
     const JIRA_DOMAIN    = process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
-    const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+    const JIRA_API_TOKEN = xJiraToken || process.env.JIRA_API_TOKEN;
 
     if (!JIRA_DOMAIN || !JIRA_API_TOKEN) {
       throw new Error("환경변수(.env) 미설정 (JIRA_DOMAIN, JIRA_API_TOKEN)");

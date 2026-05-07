@@ -25,9 +25,9 @@ async function fetchWithRetry(url, options, maxRetry = 10, minDelay = 3000, maxD
 }
 
 // Data Access Layer: 서버 측에서 Jira API와 직접 통신하는 책임을 집니다.
-export async function fetchJiraSearch(jql, fields = ["summary", "status", "assignee", "reporter", "priority", "created", "updated", "resolution", "duedate", "issuetype", "components"]) {
-  const JIRA_DOMAIN = (process.env.JIRA_DOMAIN || process.env.JIRA_HOST || "").replace(/\/$/, "");
-  const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+export async function fetchJiraSearch(jql, fields = ["summary", "status", "assignee", "reporter", "priority", "created", "updated", "resolution", "duedate", "issuetype", "components"], options = {}) {
+  const JIRA_DOMAIN = (options.domain || process.env.JIRA_DOMAIN || process.env.JIRA_HOST || "").replace(/\/$/, "");
+  const JIRA_API_TOKEN = options.apiToken || process.env.JIRA_API_TOKEN;
 
   if (!JIRA_DOMAIN || !JIRA_API_TOKEN) {
     throw new Error("환경변수(JIRA_HOST 패턴)가 설정되지 않았습니다.");

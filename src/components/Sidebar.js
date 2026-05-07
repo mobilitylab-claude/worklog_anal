@@ -8,8 +8,6 @@ export default function Sidebar() {
   
   const navItems = [
     { name: "대시보드", path: "/", icon: "📊" },
-    { name: "Filter Generation", path: "/filter-generation", icon: "📋" },
-    { name: "저장된 필터 관리", path: "/filter-management", icon: "📑" },
     { name: "워크로그 분석기", path: "/worklog", icon: "⏱️" },
     { name: "프로젝트 모니터링", path: "/project-monitoring", icon: "📈" },
     { name: "월간 리포트 보관함", path: "/monthly-reports", icon: "📑" },

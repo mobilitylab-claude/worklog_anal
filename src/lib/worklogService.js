@@ -112,7 +112,7 @@ export async function getWorklogs({
 
   debugLog.push(`[Service] JQL: ${appliedJql}`);
 
-  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created"]);
+  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
   debugLog.push(`[Service] 이슈 수집 완료: ${allIssues.length}건`);
   
   const allWorklogs = [];

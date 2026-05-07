@@ -5,9 +5,10 @@ import { fetchJiraSearch } from "@/lib/jiraClient";
 export async function POST(request) {
   try {
     const { jql } = await request.json();
+    const xJiraToken = request.headers.get("x-jira-token");
     
     // Data Access Layer 호출 (실제 로직 분리)
-    const issues = await fetchJiraSearch(jql);
+    const issues = await fetchJiraSearch(jql, undefined, { apiToken: xJiraToken });
 
     return NextResponse.json({ issues });
   } catch (error) {

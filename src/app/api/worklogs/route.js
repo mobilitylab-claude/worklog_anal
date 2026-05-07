@@ -96,8 +96,9 @@ export async function POST(request) {
       overrideJql,
     } = await request.json();
 
+    const xJiraToken = request.headers.get("x-jira-token");
     const JIRA_DOMAIN    = process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
-    const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+    const JIRA_API_TOKEN = xJiraToken || process.env.JIRA_API_TOKEN;
     const JIRA_EMAIL     = process.env.JIRA_EMAIL || "";
 
     if (!JIRA_DOMAIN || !JIRA_API_TOKEN) {
@@ -126,14 +127,15 @@ export async function POST(request) {
     let isCustomTarget  = false;
 
     // /myself API로 currentUser 정확 조회 (JIRA_EMAIL != Jira username 문제 해결)
-    let myselfName = "", myselfAccountId = "";
+    let myselfName = "", myselfAccountId = "", myselfDisplayName = "";
     try {
       const mr = await fetch(`${cleanDomain}/rest/api/2/myself`, { method: "GET", headers });
       if (mr.ok) {
         const m = await mr.json();
         myselfName      = (m.name      || "").trim();
         myselfAccountId = (m.accountId || "").trim();
-        debugLog.push(`[currentUser] name="${myselfName}" accountId="${myselfAccountId}" display="${m.displayName}"`);
+        myselfDisplayName = (m.displayName || "").trim();
+        debugLog.push(`[currentUser] name="${myselfName}" accountId="${myselfAccountId}" display="${myselfDisplayName}"`);
       } else debugLog.push(`[currentUser] /myself HTTP ${mr.status}`);
     } catch(e) { debugLog.push(`[currentUser] err: ${e.message}`); }
 
@@ -163,7 +165,7 @@ export async function POST(request) {
 
     // ── 2. 이슈 전체 페이지네이션 수집 (공용 클라이언트 사용) ───────────
     debugLog.push("[이슈 수집] 시작 (전체 수집 모드)");
-    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created"]);
+    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
     debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈 로드 완료`);
 
     // ── 3. 이슈별 워크로그 순차 수집 + 2차 필터 ─────────────────
@@ -216,11 +218,19 @@ export async function POST(request) {
           }
         } else if (!overrideJql && !isCustomTarget) {
           // "me" 자동 모드 — /myself로 얻은 name/accountId로 비교
-          if (myselfName || myselfAccountId) {
-            const wu = (w.author?.name      || "").trim();
-            const wa = (w.author?.accountId || "").trim();
-            if (!(myselfName && wu === myselfName) && !(myselfAccountId && wa === myselfAccountId)) {
-              statDropAuthor++; continue;
+          if (myselfName || myselfAccountId || typeof myselfDisplayName !== "undefined") {
+            const wu = (w.author?.name      || "").trim().toLowerCase();
+            const wa = (w.author?.accountId || "").trim().toLowerCase();
+            const wd = (w.author?.displayName || "").trim();
+            
+            const matchName = myselfName && wu === myselfName.toLowerCase();
+            const matchAcc  = myselfAccountId && wa === myselfAccountId.toLowerCase();
+            const matchDisp = typeof myselfDisplayName !== "undefined" && myselfDisplayName && (wd === myselfDisplayName || wd.startsWith(myselfDisplayName) || myselfDisplayName.startsWith(wd));
+            
+            if (!matchName && !matchAcc && !matchDisp) {
+              statDropAuthor++;
+              debugLog.push(`[작성자 필터 제외] 나: name="${myselfName}", acc="${myselfAccountId}", disp="${myselfDisplayName}" <-> 워크로그: name="${w.author?.name}", acc="${w.author?.accountId}", disp="${wd}"`);
+              continue;
             }
           }
         }

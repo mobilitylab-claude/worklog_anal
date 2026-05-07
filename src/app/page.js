@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { getJiraAuthHeaders } from "@/lib/jiraAuthClient";
 
 export default function Dashboard() {
   const [issues, setIssues] = useState([]);
@@ -69,7 +70,7 @@ export default function Dashboard() {
         // 3. 이번 주 내 워크로그 (나 "me" 기준)
         const worklogRes = await fetch("/api/worklogs", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...getJiraAuthHeaders() },
           body: JSON.stringify({ startDate: start, endDate: end, targetType: "me" })
         });
         const worklogData = await worklogRes.json();

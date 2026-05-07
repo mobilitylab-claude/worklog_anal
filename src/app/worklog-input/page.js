@@ -2,24 +2,25 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { getJiraAuthHeaders } from "@/lib/jiraAuthClient";
 
 export default function WorklogInput() {
   const router = useRouter();
 
   // ── DB 데이터 ────────────────────────────────────────────────
   const [projectCodes, setProjectCodes] = useState([]);
-  const [workTypes,    setWorkTypes]    = useState([]);
-  const [dbLoading,    setDbLoading]    = useState(true);
+  const [workTypes, setWorkTypes] = useState([]);
+  const [dbLoading, setDbLoading] = useState(true);
 
   // ── 폼 상태 ──────────────────────────────────────────────────
-  const [issueKey,     setIssueKey]     = useState("");
-  const [projectCode,  setProjectCode]  = useState("");
+  const [issueKey, setIssueKey] = useState("");
+  const [projectCode, setProjectCode] = useState("");
   const [selectedType, setSelectedType] = useState(null); // 선택된 작업 유형 객체
-  const [selectedKw,   setSelectedKw]   = useState("");   // 선택된 분류 키워드
-  const [workDate,     setWorkDate]     = useState(new Date().toISOString().split("T")[0]);
-  const [actualHours,  setActualHours]  = useState(4);
-  const [isScaleUp,    setIsScaleUp]    = useState(true);
-  const [comment,      setComment]      = useState("");
+  const [selectedKw, setSelectedKw] = useState("");   // 선택된 분류 키워드
+  const [workDate, setWorkDate] = useState(new Date().toISOString().split("T")[0]);
+  const [actualHours, setActualHours] = useState(4);
+  const [isScaleUp, setIsScaleUp] = useState(true);
+  const [comment, setComment] = useState("");
 
   // ── 데이터 로드 ───────────────────────────────────────────────
   const fetchDbData = async () => {
@@ -30,16 +31,16 @@ export default function WorklogInput() {
       ]);
       const pData = await pRes.json();
       const tData = await tRes.json();
-      
+
       const projsRaw = pData.projects || [];
       const types = tData.types || [];
-      
+
       const todayStr = new Date().toISOString().split("T")[0];
       const projs = projsRaw.filter(p => !p.end_date || p.end_date >= todayStr);
-      
+
       setProjectCodes(projs);
       setWorkTypes(types);
-      
+
       if (projs.length > 0) setProjectCode(projs[0].code);
       if (types.length > 0) {
         setSelectedType(types[0]);
@@ -68,11 +69,11 @@ export default function WorklogInput() {
   };
 
   // ── Jira 연동 상태 ──────────────────────────────────────────
-  const [loading,     setLoading]     = useState(false);
-  const [searchKey,    setSearchKey]    = useState("");
+  const [loading, setLoading] = useState(false);
+  const [searchKey, setSearchKey] = useState("");
   const [recentIssues, setRecentIssues] = useState([]); // [{ key, summary, totalHours }]
-  const [todayTotal,   setTodayTotal]   = useState(0);    // 오늘 전체 등록 공수(h)
-  const [searching,     setSearching]     = useState(false);
+  const [todayTotal, setTodayTotal] = useState(0);    // 오늘 전체 등록 공수(h)
+  const [searching, setSearching] = useState(false);
 
   // ── 권장 시간 계산 (1.25배 Scale-up) ───────────────────────────
   const recommendedHours = useMemo(() => {
@@ -84,11 +85,11 @@ export default function WorklogInput() {
   // 형식: 계약과제 코드 / 분류 키워드 / 작업 내용 (대괄호 및 이슈번호 제외)
   const finalComment = useMemo(() => {
     const prefix = `${projectCode} / ${selectedKw || "키워드"} / `;
-    
+
     // URL을 Jira Wiki 형식의 링크로 변환 ([url])
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const formattedComment = comment.replace(urlRegex, '[$1]');
-    
+
     return `${prefix}${formattedComment}`;
   }, [projectCode, selectedKw, comment]);
 
@@ -99,7 +100,7 @@ export default function WorklogInput() {
       const todayStr = new Date().toISOString().split("T")[0];
       const res = await fetch("/api/worklogs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getJiraAuthHeaders() },
         body: JSON.stringify({
           startDate: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], // 최근 30일
           endDate: todayStr,
@@ -109,7 +110,7 @@ export default function WorklogInput() {
       const data = await res.json();
       if (data.worklogs) {
         const logs = data.worklogs;
-        
+
         const jiraHost = data.jiraHost || "";
 
         // 1. 오늘 총 시간 계산
@@ -128,24 +129,24 @@ export default function WorklogInput() {
         const issueMap = {};
         logs.forEach(l => {
           if (!issueMap[l.issueKey]) {
-            issueMap[l.issueKey] = { 
-              key: l.issueKey, 
-              summary: l.issueSummary, 
+            issueMap[l.issueKey] = {
+              key: l.issueKey,
+              summary: l.issueSummary,
               totalSeconds: 0,
               issueStatus: l.issueStatus,
-              link: jiraHost ? `${jiraHost}/browse/${l.issueKey}` : ""
+              link: jiraHost ? `${jiraHost}/browse/${l.issueKey}` : "",
+              originalEstimate: l.originalEstimate || "-",
+              issueTimeSpent: l.issueTimeSpent || "-"
             };
           }
           issueMap[l.issueKey].totalSeconds += (l.timeSpentSeconds || 0);
         });
 
-        // 완료된 이슈 제외
-        const activeIssueKeys = Object.keys(issueMap).filter(key => !isDone(issueMap[key].issueStatus));
-
         // 최근 작업 순으로 정렬 (가장 최근 로그가 있는 이슈가 위로)
-        const sortedKeys = Array.from(new Set(logs.map(l => l.issueKey))).filter(key => activeIssueKeys.includes(key)).slice(0, 10);
+        const sortedKeys = Array.from(new Set(logs.map(l => l.issueKey))).slice(0, 10);
         const processedIssues = sortedKeys.map(key => ({
           ...issueMap[key],
+          isResolved: isDone(issueMap[key].issueStatus),
           totalHours: (issueMap[key].totalSeconds / 3600).toFixed(1)
         }));
 
@@ -159,6 +160,23 @@ export default function WorklogInput() {
   };
 
   useEffect(() => { loadRecentIssues(); }, []);
+
+  // ── 이슈 선택 핸들러 ───────────────────────────────────────────
+  const handleIssueSelect = (issue) => {
+    setIssueKey(issue.key);
+
+    // 이슈 요약(summary)에서 [PREFIX] 형태 추출하여 계약과제 코드 자동 매칭
+    if (issue.summary) {
+      const match = issue.summary.match(/^\[([^\]]+)\]/);
+      if (match) {
+        const prefix = match[1].trim();
+        const exists = projectCodes.some(p => p.code === prefix);
+        if (exists) {
+          setProjectCode(prefix);
+        }
+      }
+    }
+  };
 
   // ── 등록 실행 ────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -175,7 +193,7 @@ export default function WorklogInput() {
 
       const res = await fetch("/api/worklogs/add", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getJiraAuthHeaders() },
         body: JSON.stringify({
           issueKey,
           started,
@@ -223,14 +241,18 @@ export default function WorklogInput() {
                 <span style={{ fontSize: "0.8rem", color: "#555" }}>조회 중...</span>
               )}
               {recentIssues.map(issue => (
-                <button key={issue.key} 
-                  onClick={() => setIssueKey(issue.key)}
-                  style={{ 
-                    cursor: "pointer", fontSize: "0.75rem", padding: "4px 10px", 
-                    background: issueKey === issue.key ? "var(--accent-color)" : "#1a1a2e", 
-                    border: `1px solid ${issueKey === issue.key ? "var(--accent-color)" : "#333"}`, 
-                    borderRadius: "6px", color: issueKey === issue.key ? "white" : "#ccc",
-                    transition: "all 0.2s"
+                <button key={issue.key}
+                  onClick={() => handleIssueSelect(issue)}
+                  title={issue.isResolved ? "완료된 이슈입니다. 세부 정보만 조회할 수 있습니다." : ""}
+                  style={{
+                    cursor: "pointer",
+                    fontSize: "0.75rem", padding: "4px 10px",
+                    background: issueKey === issue.key ? (issue.isResolved ? "#7f1d1d" : "var(--accent-color)") : (issue.isResolved ? "#222" : "#1a1a2e"),
+                    border: `1px solid ${issueKey === issue.key ? (issue.isResolved ? "#ef4444" : "var(--accent-color)") : (issue.isResolved ? "#333" : "#333")}`,
+                    borderRadius: "6px",
+                    color: issueKey === issue.key ? "white" : (issue.isResolved ? "#666" : "#ccc"),
+                    transition: "all 0.2s",
+                    textDecoration: issue.isResolved ? "line-through" : "none"
                   }}>
                   {issue.key}
                 </button>
@@ -251,9 +273,21 @@ export default function WorklogInput() {
                       )
                     ) : "이슈 상세 정보를 불러올 수 없습니다."}
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                    {selected && `🕒 최근 30일 누적 공수: ${selected.totalHours}h`}
-                  </div>
+                  {selected && (
+                    <div style={{ marginTop: "0.75rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+                      <div style={{ background: "rgba(0,0,0,0.3)", padding: "0.6rem 1rem", borderRadius: "8px", border: "1px solid rgba(59,130,246,0.3)", display: "flex", flexDirection: "column", minWidth: "120px" }}>
+                        <span style={{ fontSize: "0.7rem", color: "#9ca3af", marginBottom: "0.2rem" }}>🎯 계획 시간 (Estimate)</span>
+                        <span style={{ fontSize: "1.1rem", color: "#60a5fa", fontWeight: "bold" }}>{selected.originalEstimate !== "-" ? selected.originalEstimate : "미정"}</span>
+                      </div>
+                      <div style={{ background: "rgba(0,0,0,0.3)", padding: "0.6rem 1rem", borderRadius: "8px", border: "1px solid rgba(16,185,129,0.3)", display: "flex", flexDirection: "column", minWidth: "120px" }}>
+                        <span style={{ fontSize: "0.7rem", color: "#9ca3af", marginBottom: "0.2rem" }}>⏳ 현재 총 작업시간 (Logged)</span>
+                        <span style={{ fontSize: "1.1rem", color: "#34d399", fontWeight: "bold" }}>{selected.issueTimeSpent !== "-" ? selected.issueTimeSpent : "0h"}</span>
+                      </div>
+                      <div style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "right" }}>
+                        🕒 (나의) 최근 30일 누적 공수: {selected.totalHours}h
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -282,9 +316,9 @@ export default function WorklogInput() {
             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "var(--accent-color)" }}>03-1. 분류 키워드 선택 (실제 입력값)</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
               {(selectedType?.keywords || []).map(kw => (
-                <button key={kw} 
+                <button key={kw}
                   onClick={() => setSelectedKw(kw)}
-                  style={{ 
+                  style={{
                     padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", cursor: "pointer",
                     background: selectedKw === kw ? "var(--accent-color)" : "#222",
                     color: selectedKw === kw ? "white" : "#888",
@@ -322,7 +356,7 @@ export default function WorklogInput() {
                   <input type="checkbox" checked={isScaleUp} onChange={e => setIsScaleUp(e.target.checked)} /> 1.25x UP
                 </label>
               </div>
-              <div style={{ fontSize: "0.7rem", color: todayTotal >= 8 ? "#10b981" : "#f97316", marginTop: "2px" }}>
+              <div style={{ fontSize: "1.2rem", color: todayTotal >= 8 ? "#10b981" : "#f97316", marginTop: "2px" }}>
                 🎯 오늘 총 등록: {todayTotal.toFixed(1)}h / 8h
               </div>
             </div>
@@ -331,18 +365,29 @@ export default function WorklogInput() {
           {/* 4. 작업 내용 */}
           <div style={{ marginBottom: "1.5rem" }}>
             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "#888" }}>07. 작업 상세 내용 (최소 1문장 이상)</label>
-            <textarea 
-              value={comment} 
+            <textarea
+              value={comment}
               onChange={e => setComment(e.target.value)}
-              placeholder="구체적인 작업 영용을 입력하세요 (예: ccNC 음성인식 엔진 로그 분석 및 이슈 대응)"
+              placeholder="구체적인 작업 내용을 입력하세요 (예: ccNC 음성인식 엔진 로그 분석 및 이슈 대응)"
               style={{ width: "100%", height: "100px", padding: "0.8rem", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "white", outline: "none" }}
             />
           </div>
 
-          <button onClick={handleSubmit} disabled={loading} className="btn btn-primary" 
-            style={{ width: "100%", padding: "1rem", fontSize: "1rem", fontWeight: "bold" }}>
-            {loading ? "Jira에 등록 중..." : "🚀 공수 등록 (Jira 공식 전송)"}
-          </button>
+          {(() => {
+            const isSelectedResolved = issueKey && recentIssues.find(i => i.key === issueKey)?.isResolved;
+            return (
+              <button onClick={handleSubmit} disabled={loading || isSelectedResolved} className="btn btn-primary"
+                style={{
+                  width: "100%", padding: "1rem", fontSize: "1rem", fontWeight: "bold",
+                  opacity: isSelectedResolved ? 0.6 : 1,
+                  cursor: isSelectedResolved ? "not-allowed" : "pointer",
+                  background: isSelectedResolved ? "#444" : undefined,
+                  border: isSelectedResolved ? "none" : undefined
+                }}>
+                {loading ? "Jira에 등록 중..." : (isSelectedResolved ? "⚠️ 완료된 이슈는 공수를 등록할 수 없습니다 (Reopen 필요)" : "🚀 공수 등록 (Jira 공식 전송)")}
+              </button>
+            );
+          })()}
         </div>
 
         {/* 안내 카드 */}
