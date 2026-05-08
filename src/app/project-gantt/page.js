@@ -56,6 +56,7 @@ export default function ProjectGantt() {
   const [issuesData, setIssuesData] = useState([]); // Array of issue objects
   const [timeline, setTimeline] = useState([]); // Array of time units
   const [selectedIssueWorklogs, setSelectedIssueWorklogs] = useState(null);
+  const [selectedAuthor, setSelectedAuthor] = useState("all");
   const ganttWrapperRef = useRef(null);
 
   // Auto-scroll to "today" when timeline renders
@@ -81,7 +82,14 @@ export default function ProjectGantt() {
       .then(d => {
         const projs = d.projects || [];
         setProjects(projs);
-        if (projs.length > 0) setSelectedProject(projs[0].code);
+        if (projs.length > 0) {
+          const lastProj = localStorage.getItem("gantt_last_selected_project");
+          if (lastProj && projs.find(p => p.code === lastProj)) {
+             setSelectedProject(lastProj);
+          } else {
+             setSelectedProject(projs[0].code);
+          }
+        }
       });
   }, []);
 
@@ -332,11 +340,36 @@ export default function ProjectGantt() {
     };
   };
 
-  const totalProjectHours = issuesData.reduce((acc, i) => acc + parseFloat(i.totalHours || 0), 0);
+  const projectAuthors = useMemo(() => {
+    const authors = new Set();
+    issuesData.forEach(issue => {
+      issue.worklogs.forEach(wl => {
+         if (wl.author) authors.add(wl.author);
+      });
+    });
+    return Array.from(authors).sort();
+  }, [issuesData]);
+
+  const filteredIssuesData = useMemo(() => {
+    if (selectedAuthor === "all") return issuesData;
+    return issuesData.filter(issue => issue.worklogs.some(wl => wl.author === selectedAuthor));
+  }, [issuesData, selectedAuthor]);
+
+  const totalProjectHours = filteredIssuesData.reduce((acc, i) => acc + parseFloat(i.totalHours || 0), 0);
   const totalProjectMM = (totalProjectHours / 160).toFixed(2);
-  const activeIssues = issuesData.filter(i => !i.isResolved && !i.isOverdue).length;
-  const resolvedIssues = issuesData.filter(i => i.isResolved).length;
-  const attentionIssues = issuesData.filter(i => i.isOverdue).length;
+  const activeIssues = filteredIssuesData.filter(i => !i.isResolved && !i.isOverdue).length;
+  const resolvedIssues = filteredIssuesData.filter(i => i.isResolved).length;
+  const attentionIssues = filteredIssuesData.filter(i => i.isOverdue).length;
+
+  const handleProjectSelect = (e) => {
+    const code = e.target.value;
+    setSelectedProject(code);
+    localStorage.setItem("gantt_last_selected_project", code);
+  };
+
+  const todayStrForGrouping = new Date().toISOString().split("T")[0];
+  const ongoingProjects = projects.filter(p => !p.end_date || p.end_date >= todayStrForGrouping);
+  const completedProjects = projects.filter(p => p.end_date && p.end_date < todayStrForGrouping);
 
   return (
     <div style={styles.container}>
@@ -344,14 +377,14 @@ export default function ProjectGantt() {
         <div>
           <h1 style={{ fontSize: "1.5rem", marginBottom: "0.2rem", display: "flex", alignItems: "center" }}>
             프로젝트 간트 차트
-            {issuesData.length > 0 && (
+            {filteredIssuesData.length > 0 && (
               <span style={{ fontSize: "0.9rem", color: "var(--accent-color)", marginLeft: "1rem", background: "rgba(59,130,246,0.1)", padding: "0.2rem 0.6rem", borderRadius: "8px", border: "1px solid rgba(59,130,246,0.3)" }}>
                 총 누적: {totalProjectHours.toFixed(1)}h ({totalProjectMM} MM)
               </span>
             )}
           </h1>
           <p style={{ color: "#888", fontSize: "0.9rem" }}>선택한 계약 과제의 전체 기간 이슈별 워크로그 진행 현황</p>
-          {issuesData.length > 0 && (
+          {filteredIssuesData.length > 0 && (
             <div style={{ display: "flex", gap: "1rem", marginTop: "0.8rem" }}>
               <span style={{ fontSize: "0.85rem", background: "rgba(59,130,246,0.1)", color: "#60a5fa", padding: "0.3rem 0.6rem", borderRadius: "6px", border: "1px solid rgba(59,130,246,0.3)" }}>
                 활성화: {activeIssues}건
@@ -366,11 +399,27 @@ export default function ProjectGantt() {
           )}
         </div>
         
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={styles.selectBox}>
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+          <select value={selectedProject} onChange={handleProjectSelect} style={styles.selectBox}>
             <option value="" disabled>계약 과제를 선택하세요</option>
-            {projects.map(p => <option key={p.code} value={p.code}>[{p.code}] {p.name}</option>)}
+            {ongoingProjects.length > 0 && (
+              <optgroup label="▶ 진행 중인 과제" style={{ background: "#222", color: "#60a5fa" }}>
+                {ongoingProjects.map(p => <option key={p.code} value={p.code} style={{ color: "white" }}>[{p.code}] {p.name}</option>)}
+              </optgroup>
+            )}
+            {completedProjects.length > 0 && (
+              <optgroup label="✓ 완료된 과제" style={{ background: "#111", color: "#888" }}>
+                {completedProjects.map(p => <option key={p.code} value={p.code} style={{ color: "#aaa" }}>[{p.code}] {p.name}</option>)}
+              </optgroup>
+            )}
           </select>
+          
+          {projectAuthors.length > 0 && (
+            <select value={selectedAuthor} onChange={e => setSelectedAuthor(e.target.value)} style={{ ...styles.selectBox, minWidth: "150px" }}>
+              <option value="all">모든 작업자 (전체)</option>
+              {projectAuthors.map(author => <option key={author} value={author}>{author}</option>)}
+            </select>
+          )}
           
           <div style={styles.viewSwitcher}>
             <button style={styles.viewBtn(viewMode === "day")} onClick={() => setViewMode("day")}>일별</button>
@@ -394,10 +443,10 @@ export default function ProjectGantt() {
           <div style={styles.yAxis}>
             <div style={styles.yAxisHeader}>이슈 목록 (다중 사용자 병합)</div>
             <div>
-              {issuesData.length === 0 && !loading && (
+              {filteredIssuesData.length === 0 && !loading && (
                 <div style={{ padding: "2rem 1rem", color: "#666", textAlign: "center" }}>기록된 이슈가 없습니다.</div>
               )}
-              {issuesData.map(issue => (
+              {filteredIssuesData.map(issue => (
                 <div key={issue.key} style={{...styles.issueRow, opacity: issue.isResolved ? 0.5 : 1}}>
                   <div style={{ fontSize: "0.8rem", color: issue.isResolved ? "#888" : "var(--accent-color)", fontWeight: "bold" }}>
                     <a href={issue.link} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>{issue.key} 🔗</a>
@@ -423,7 +472,7 @@ export default function ProjectGantt() {
             </div>
             
             <div>
-              {issuesData.map(issue => (
+              {filteredIssuesData.map(issue => (
                 <div key={issue.key} style={styles.chartRow}>
                   {/* Background Grid Cells */}
                   {timeline.map(t => {
