@@ -10,6 +10,7 @@ export default function Sidebar() {
     { name: "대시보드", path: "/", icon: "📊" },
     { name: "워크로그 분석기", path: "/worklog", icon: "⏱️" },
     { name: "프로젝트 모니터링", path: "/project-monitoring", icon: "📈" },
+    { name: "프로젝트 간트 차트", path: "/project-gantt", icon: "🗓️" },
     { name: "월간 리포트 보관함", path: "/monthly-reports", icon: "📑" },
     { name: "저장된 스케줄 관리", path: "/schedule-management", icon: "⏰" },
     { name: "표준 공수 입력", path: "/worklog-input", icon: "✏️" },

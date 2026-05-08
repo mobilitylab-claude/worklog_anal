@@ -179,12 +179,26 @@ export async function POST(request) {
     const applyDateFilter = !(overrideJql && overrideJql.trim() && !isCustomTarget);
     debugLog.push(`[2차 날짜 필터] ${applyDateFilter ? `적용 (${startDate}~${endDate})` : "미적용 — 수동 JQL 신뢰"}`);
 
-    for (const issue of allIssues) {
-      const logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
-      await sleep(100);
-      let keptInIssue = 0;
+    const chunkArray = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
+    const issueChunks = chunkArray(allIssues, 10);
+    
+    for (const chunk of issueChunks) {
+      const chunkResults = await Promise.all(chunk.map(async (issue) => {
+        try {
+          const logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
+          return { issue, logs };
+        } catch (e) {
+          debugLog.push(`[Error] ${issue.key} 워크로그 수집 실패: ${e.message}`);
+          return { issue, logs: [] };
+        }
+      }));
 
-      for (const w of logs) {
+      await sleep(100);
+
+      for (const { issue, logs } of chunkResults) {
+        let keptInIssue = 0;
+
+        for (const w of logs) {
         statTotal++;
         if (seenWorklogIds.has(w.id)) { statDropDup++; continue; }
         seenWorklogIds.add(w.id);
@@ -319,7 +333,8 @@ export async function POST(request) {
       if (keptInIssue > 0) {
         debugLog.push(`[${issue.key}] 전체=${logs.length}건 → 조건 충족=${keptInIssue}건`);
       }
-    }
+      } // end chunkResults loop
+    } // end chunk loop
 
     allWorklogs.sort((a, b) => new Date(b.started) - new Date(a.started));
 
