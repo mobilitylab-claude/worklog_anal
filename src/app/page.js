@@ -7,7 +7,8 @@ import { getJiraAuthHeaders } from "@/lib/jiraAuthClient";
 export default function Dashboard() {
   const [issues, setIssues] = useState([]);
   const [stats, setStats] = useState({ totalUsers: 0, partStats: [] });
-  const [weekWorklogs, setWeekWorklogs] = useState([]);
+  const [todayWorklogs, setTodayWorklogs] = useState([]);
+  const [todayLoading, setTodayLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 그룹 모니터링 관리 필드들
@@ -67,15 +68,6 @@ export default function Dashboard() {
         const savedGroups = configData.monitor_groups || "VRHMI, VRMW";
         setMonitorGroups(savedGroups);
 
-        // 3. 이번 주 내 워크로그 (나 "me" 기준)
-        const worklogRes = await fetch("/api/worklogs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getJiraAuthHeaders() },
-          body: JSON.stringify({ startDate: start, endDate: end, targetType: "me" })
-        });
-        const worklogData = await worklogRes.json();
-        setWeekWorklogs(worklogData.worklogs || []);
-
         // 4. 자동 수집된 어제자 워크로그 리포트 (worklog_results 테이블에서 최신 daily 결과)
         const reportRes = await fetch("/api/worklog-results?type=daily&limit=1", { cache: 'no-store' });
         if (reportRes.ok) {
@@ -100,6 +92,43 @@ export default function Dashboard() {
     fetchDashboardData();
   }, [start, end]);
 
+  useEffect(() => {
+    async function fetchAllAccountsWorklogs() {
+      setTodayLoading(true);
+      try {
+        const stored = localStorage.getItem("jiraAccounts");
+        const accounts = stored ? JSON.parse(stored) : [];
+        if (accounts.length === 0) {
+          setTodayWorklogs([]);
+          setTodayLoading(false);
+          return;
+        }
+
+        const rawNow = new Date();
+        const todayStr = rawNow.toISOString().split('T')[0];
+
+        const promises = accounts.map(async (acc) => {
+          const reqBody = { startDate: todayStr, endDate: todayStr, targetType: "me" };
+          const res = await fetch("/api/worklogs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-jira-token": acc.token },
+            body: JSON.stringify(reqBody)
+          });
+          const data = await res.json();
+          return { account: acc, logs: data.worklogs || [] };
+        });
+
+        const results = await Promise.all(promises);
+        setTodayWorklogs(results);
+      } catch (e) {
+        console.error("오늘 워크로그 로딩 실패:", e);
+      } finally {
+        setTodayLoading(false);
+      }
+    }
+    if (!loading) fetchAllAccountsWorklogs();
+  }, [loading]);
+
   const getStatusColor = (colorName) => {
     if (!colorName) return "default";
     if (["blue-gray", "medium-gray"].includes(colorName)) return "blue";
@@ -108,8 +137,8 @@ export default function Dashboard() {
     return "default";
   };
 
-  const totalWeeklySeconds = weekWorklogs.reduce((acc, curr) => acc + (curr.timeSpentSeconds || 0), 0);
-  const totalWeeklyHours = (totalWeeklySeconds / 3600).toFixed(1);
+  const totalTodaySeconds = todayWorklogs.reduce((acc, userObj) => acc + userObj.logs.reduce((sum, wl) => sum + (wl.timeSpentSeconds || 0), 0), 0);
+  const totalTodayHours = (totalTodaySeconds / 3600).toFixed(1);
 
   const monitorActualSeconds = monitorLogs.reduce((acc, curr) => acc + (curr.timeSpentSeconds || 0), 0);
   const monitorActualHours = (monitorActualSeconds / 3600).toFixed(1);
@@ -306,16 +335,73 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Widget 4: 이번 주 워크로그 요약 */}
-        <div className="widget card" style={{ minWidth: 0 }}>
-          <div className="widget-header">
-            <h2>⏱️ 주간 워크로그 요약</h2>
-            <Link href="/worklog" className="widget-link" style={{ fontSize: "0.8rem" }}>분석기 가기 &rarr;</Link>
+        {/* Widget 4: 오늘 작업내역 현황 */}
+        <div className="widget card" style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <div className="widget-header" style={{ alignItems: "center", gap: "0.5rem", flexWrap: "wrap", paddingBottom: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+               <h2 style={{ whiteSpace: "nowrap" }}>⏱️ 오늘 작업내역 현황</h2>
+            </div>
+            <Link href="/worklog" className="widget-link" style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>분석기 가기 &rarr;</Link>
           </div>
-          <div className="widget-content" style={{ textAlign: "center", minHeight: "130px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "12px", padding: "1rem 2rem" }}>
-               <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#10b981" }}>{totalWeeklyHours} H</div>
-               <p style={{ fontSize: "0.8rem", color: "#10b981" }}>이번 주 누적 작업량</p>
+          <div className="widget-content" style={{ flex: 1, display: "flex", flexDirection: "column", paddingTop: "0.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexShrink: 0 }}>
+               <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>오늘 접속 가능 계정: {todayWorklogs.length}개</span>
+               <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "8px", padding: "0.3rem 0.8rem" }}>
+                 <span style={{ fontSize: "1rem", fontWeight: "bold", color: "#10b981" }}>전체 누적: {totalTodayHours} H</span>
+               </div>
+            </div>
+            
+            <div style={{ flex: 1 }}>
+              {todayLoading ? (
+                 <div className="loading" style={{ padding: "2rem", display: "flex", alignItems: "center", justifyContent: "center" }}>데이터 불러오는 중...</div>
+              ) : todayWorklogs.length > 0 ? (
+                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                   {todayWorklogs.map((userRes) => {
+                     const userTotal = userRes.logs.reduce((s, wl) => s + (wl.timeSpentSeconds || 0), 0);
+                     const userTotalH = parseFloat((userTotal / 3600).toFixed(1));
+                     const targetH = 8.0;
+                     const percentage = Math.min(100, Math.max(0, (userTotalH / targetH) * 100));
+                     const isOvertime = userTotalH > targetH;
+
+                     return (
+                       <div key={userRes.account.id} style={{ background: "rgba(255,255,255,0.03)", padding: "1rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }}>
+                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                             <span style={{ fontSize: "1.2rem" }}>👤</span>
+                             <span style={{ fontWeight: "bold", color: "var(--text-primary)", fontSize: "1rem" }}>{userRes.account.name}</span>
+                           </div>
+                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                             <span style={{ fontSize: "1.1rem", fontWeight: "bold", color: isOvertime ? "#f87171" : "#10b981" }}>{userTotalH}h</span>
+                             <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>/ 8.0h</span>
+                           </div>
+                         </div>
+                         
+                         {/* Progress bar */}
+                         <div style={{ width: "100%", height: "10px", background: "rgba(255,255,255,0.1)", borderRadius: "6px", overflow: "hidden" }}>
+                           <div style={{ 
+                             width: `${percentage}%`, 
+                             height: "100%", 
+                             background: isOvertime ? "linear-gradient(90deg, #10b981, #f87171)" : "linear-gradient(90deg, #34d399, #10b981)",
+                             borderRadius: "6px",
+                             transition: "width 0.5s ease-out"
+                           }}></div>
+                         </div>
+                         
+                         {/* Status text */}
+                         <div style={{ marginTop: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)", textAlign: "right" }}>
+                           {userTotalH === 0 ? "작업 내역이 없습니다." : 
+                            userTotalH >= targetH ? "일일 목표를 달성했습니다! 🎉" : 
+                            `${(targetH - userTotalH).toFixed(1)}h 남았습니다.`}
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+              ) : (
+                 <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: "2rem" }}>
+                   등록된 계정이 없습니다. (로그인 필요)
+                 </div>
+              )}
             </div>
           </div>
         </div>
