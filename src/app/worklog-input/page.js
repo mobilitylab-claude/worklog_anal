@@ -208,7 +208,8 @@ export default function WorklogInput() {
       alert("✅ Jira에 공수 등록 완료!");
       // 폼 초기화 혹은 분석 페이지로 이동
       setComment("");
-      router.push("/worklog");
+      router.refresh();
+      //router.push("/worklog");
     } catch (err) {
       alert("❌ 등록 실패: " + err.message);
     } finally {
