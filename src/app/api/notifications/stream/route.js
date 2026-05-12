@@ -1,4 +1,4 @@
-import { sseClients } from '@/lib/sseClients';
+import { sseClients, addClient } from '@/lib/sseClients';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +7,7 @@ export async function GET() {
   const stream = new ReadableStream({
     start(c) {
       controller = c;
-      sseClients.add(c);
+      addClient(c);
       
       const encoder = new TextEncoder();
       // 연결 성공 시 초기 메시지 전송

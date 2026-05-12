@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const stmt = db.prepare('SELECT * FROM users ORDER BY part ASC, name ASC');
