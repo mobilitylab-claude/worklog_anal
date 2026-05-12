@@ -16,6 +16,7 @@ export default function Sidebar() {
     { name: "표준 공수 입력", path: "/worklog-input", icon: "✏️" },
     { name: "표준 및 기준 관리", path: "/standard-management", icon: "⚙️" },
     { name: "JIRA 사용자 관리", path: "/user-management", icon: "👥" },
+    { name: "JIRA 알림 관리", path: "/notifications", icon: "🔔" },
   ];
 
   return (
