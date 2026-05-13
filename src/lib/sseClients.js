@@ -44,4 +44,9 @@ export function broadcastNotification(payload) {
 export function addClient(client) {
   sseClients.add(client);
   startPolling();
+  
+  // 신규 클라이언트 접속 시 즉시 데이터 갱신을 위해 1회 조회
+  fetch("http://127.0.0.1:3000/api/cron/jira-monitor").catch(() => 
+    fetch("http://192.168.105.10:3000/api/cron/jira-monitor")
+  ).catch(e => console.error("Immediate poll failed", e.message));
 }

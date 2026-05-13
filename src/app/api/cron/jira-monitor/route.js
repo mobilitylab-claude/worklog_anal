@@ -104,35 +104,85 @@ export async function GET() {
 
   // 오늘 날짜 기준 유저별 누적 시간 캐시 (이번 Cron 실행 중에만 재사용)
   const userDailyHoursCache = {};
+  const userDetailsCache = {};
 
-  const getDailyAccumulatedHours = async (authorName) => {
-    if (userDailyHoursCache[authorName] !== undefined) return userDailyHoursCache[authorName];
-    
-    try {
-      // 오늘 생성된 워크로그만 검색 (JQL)
-      const query = `worklogAuthor = "${authorName}" AND worklogDate >= startOfDay() AND worklogDate <= endOfDay()`;
-      const resultIssues = await fetchJiraSearch(query, ['worklog']);
-      let totalSeconds = 0;
-      
-      for (const iss of resultIssues) {
-        const wls = iss.fields?.worklog?.worklogs || [];
-        for (const w of wls) {
-          const wlAuthor = w.author?.name || w.author?.displayName;
-          if (wlAuthor === authorName) {
-            // 오늘 날짜인지 한 번 더 확인
-            if (w.started && w.started.startsWith(todayStr)) {
-              totalSeconds += (w.timeSpentSeconds || 0);
+  // 미리 모든 대상자의 오늘 누적 시간을 계산하여 캐시에 채워둠 (JQL 제약 및 페이지네이션 해결)
+  try {
+    if (rules.USER_WORKLOG.isActive && rules.USER_WORKLOG.target) {
+      const targets = rules.USER_WORKLOG.target.split(',').map(s => s.trim()).filter(s => s);
+      if (targets.length > 0) {
+        const jqlAll = `worklogDate >= startOfDay() AND worklogDate <= endOfDay()`;
+        const issuesAll = await fetchJiraSearch(jqlAll, ['summary']);
+        
+        const JIRA_DOMAIN_MON = (process.env.JIRA_DOMAIN || process.env.JIRA_HOST || "").replace(/\/$/, "");
+        const JIRA_API_TOKEN_MON = process.env.JIRA_API_TOKEN;
+        const authHeaderMon = `Bearer ${JIRA_API_TOKEN_MON}`;
+
+        for (const iss of issuesAll) {
+          const issueKey = iss.key;
+          let wls = [];
+          let startAt = 0;
+          let total = 1;
+          
+          while (wls.length < total) {
+            const url = `${JIRA_DOMAIN_MON}/rest/api/2/issue/${issueKey}/worklog?startAt=${startAt}&maxResults=1000`;
+            const res = await fetch(url, {
+              method: "GET",
+              headers: { "Authorization": authHeaderMon }
+            });
+            
+            if (res.ok) {
+              const data = await res.json();
+              const logs = data.worklogs || [];
+              wls = wls.concat(logs);
+              total = data.total ?? 0;
+              if (logs.length === 0) break;
+              startAt += logs.length;
+            } else {
+              break;
+            }
+          }
+
+          for (const w of wls) {
+            const wlAuthor = w.author?.displayName || w.author?.name || "";
+            const matchedTarget = targets.find(t => wlAuthor.toLowerCase().includes(t.toLowerCase()));
+            if (matchedTarget) {
+              if (w.started && w.started.startsWith(todayStr)) {
+                const hours = (w.timeSpentSeconds || 0) / 3600;
+                userDailyHoursCache[matchedTarget] = (userDailyHoursCache[matchedTarget] || 0) + hours;
+                
+                if (!userDetailsCache[matchedTarget]) userDetailsCache[matchedTarget] = [];
+                userDetailsCache[matchedTarget].push({
+                  issueKey: issueKey,
+                  summary: iss.fields?.summary || '',
+                  hours: parseFloat(hours.toFixed(1)),
+                  comment: w.comment || '',
+                  time: w.started
+                });
+              }
             }
           }
         }
+        
+        // 모든 대상자에 대해 기본값 0 설정 및 포맷팅
+        targets.forEach(t => {
+          if (userDailyHoursCache[t] === undefined) userDailyHoursCache[t] = 0;
+          userDailyHoursCache[t] = parseFloat(userDailyHoursCache[t].toFixed(1));
+          if (!userDetailsCache[t]) userDetailsCache[t] = [];
+        });
       }
-      const hours = totalSeconds / 3600;
-      userDailyHoursCache[authorName] = hours;
-      return hours;
-    } catch (e) {
-      console.error("Failed to fetch daily hours for", authorName, e.message);
-      return 0;
     }
+  } catch (err) {
+    console.error("Failed to pre-calculate user stats in cron:", err);
+  }
+
+  const getDailyAccumulatedHours = async (authorName) => {
+    const targets = rules.USER_WORKLOG.target ? rules.USER_WORKLOG.target.split(',').map(s => s.trim()).filter(s => s) : [];
+    const matchedTarget = targets.find(t => authorName.toLowerCase().includes(t.toLowerCase()));
+    if (matchedTarget) {
+      return userDailyHoursCache[matchedTarget] || 0;
+    }
+    return 0;
   };
 
   let notifiedCount = 0;
@@ -275,6 +325,20 @@ export async function GET() {
   }
 
   if (notifiedCache.size > 5000) notifiedCache.clear();
+
+  // 매 크론 실행마다(10분 간격) 현재 시점의 전체 모니터링 대상자 누적 시간을 브로드캐스트
+  try {
+    if (rules.USER_WORKLOG.isActive && rules.USER_WORKLOG.target) {
+      broadcastNotification({
+        notiType: 'ALL_USER_STATS',
+        stats: userDailyHoursCache,
+        details: userDetailsCache,
+        time: new Date().toLocaleTimeString()
+      });
+    }
+  } catch (err) {
+    console.error("Failed to broadcast ALL_USER_STATS:", err);
+  }
 
   return Response.json({ 
     success: true, 
