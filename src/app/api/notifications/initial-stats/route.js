@@ -13,7 +13,19 @@ export async function GET() {
       return Response.json({ success: true, stats: {} });
     }
 
-    const targets = targetStr.split(',').map(s => s.trim()).filter(s => s);
+    const rawTargets = targetStr.split(',').map(s => s.trim()).filter(s => s);
+    const targets = [];
+    const seenNames = new Set();
+    
+    for (const raw of rawTargets) {
+      // 공백 이전의 순수 이름만 추출 (예: "탄보련 기타모비스온사용자" -> "탄보련")
+      const name = raw.split(' ')[0];
+      if (!seenNames.has(name)) {
+        seenNames.add(name);
+        targets.push(name);
+      }
+    }
+
     if (targets.length === 0) {
       return Response.json({ success: true, stats: {} });
     }

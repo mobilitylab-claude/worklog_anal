@@ -109,56 +109,135 @@ export async function GET() {
   // 미리 모든 대상자의 오늘 누적 시간을 계산하여 캐시에 채워둠 (JQL 제약 및 페이지네이션 해결)
   try {
     if (rules.USER_WORKLOG.isActive && rules.USER_WORKLOG.target) {
-      const targets = rules.USER_WORKLOG.target.split(',').map(s => s.trim()).filter(s => s);
+      const rawTargets = rules.USER_WORKLOG.target.split(',').map(s => s.trim()).filter(s => s);
+      const targets = [];
+      const seenNames = new Set();
+      
+      for (const raw of rawTargets) {
+        // 공백 이전의 순수 이름만 추출 (예: "탄보련 기타모비스온사용자" -> "탄보련")
+        const name = raw.split(' ')[0];
+        if (!seenNames.has(name)) {
+          seenNames.add(name);
+          targets.push(name);
+        }
+      }
+
       if (targets.length > 0) {
-        const jqlAll = `worklogDate >= startOfDay() AND worklogDate <= endOfDay()`;
+        // 한글 이름 -> DT 계정 매핑 조회 (JQL 최적화용)
+        const dtAccounts = [];
+        const dtToName = {};
+        
+        for (const name of targets) {
+          const userRow = db.prepare('SELECT dt_account FROM users WHERE name = ?').get(name);
+          if (userRow && userRow.dt_account) {
+            dtAccounts.push(userRow.dt_account);
+            dtToName[userRow.dt_account] = name;
+          } else {
+            // DB에 없으면 이름 그대로 사용 (폴백)
+            dtAccounts.push(name);
+            dtToName[name] = name;
+          }
+        }
+
+        const todayObj = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+        const tomorrow = new Date(todayObj.getTime() + 24 * 60 * 60 * 1000);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+        // 사용자가 제안한 대로 worklogAuthor in () 을 활용하여 쿼리 최적화 (DT 계정 기반)
+        const jqlAll = `worklogDate >= "${todayStr}" AND worklogDate < "${tomorrowStr}" AND worklogAuthor in (${dtAccounts.map(id => `"${id}"`).join(', ')})`;
         const issuesAll = await fetchJiraSearch(jqlAll, ['summary']);
         
         const JIRA_DOMAIN_MON = (process.env.JIRA_DOMAIN || process.env.JIRA_HOST || "").replace(/\/$/, "");
         const JIRA_API_TOKEN_MON = process.env.JIRA_API_TOKEN;
         const authHeaderMon = `Bearer ${JIRA_API_TOKEN_MON}`;
 
-        for (const iss of issuesAll) {
-          const issueKey = iss.key;
-          let wls = [];
-          let startAt = 0;
-          let total = 1;
-          
-          while (wls.length < total) {
-            const url = `${JIRA_DOMAIN_MON}/rest/api/2/issue/${issueKey}/worklog?startAt=${startAt}&maxResults=1000`;
-            const res = await fetch(url, {
-              method: "GET",
-              headers: { "Authorization": authHeaderMon }
-            });
-            
-            if (res.ok) {
-              const data = await res.json();
-              const logs = data.worklogs || [];
-              wls = wls.concat(logs);
-              total = data.total ?? 0;
-              if (logs.length === 0) break;
-              startAt += logs.length;
-            } else {
-              break;
-            }
-          }
+        const results = [];
+        const chunkSize = 5;
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-          for (const w of wls) {
-            const wlAuthor = w.author?.displayName || w.author?.name || "";
-            const matchedTarget = targets.find(t => wlAuthor.toLowerCase().includes(t.toLowerCase()));
-            if (matchedTarget) {
-              if (w.started && w.started.startsWith(todayStr)) {
-                const hours = (w.timeSpentSeconds || 0) / 3600;
-                userDailyHoursCache[matchedTarget] = (userDailyHoursCache[matchedTarget] || 0) + hours;
+        for (let i = 0; i < issuesAll.length; i += chunkSize) {
+          const chunk = issuesAll.slice(i, i + chunkSize);
+          
+          const chunkResults = await Promise.all(chunk.map(async (iss) => {
+            const issueKey = iss.key;
+            let wls = [];
+            let startAt = 0;
+            let total = 1;
+            
+            try {
+              while (wls.length < total) {
+                const url = `${JIRA_DOMAIN_MON}/rest/api/2/issue/${issueKey}/worklog?startAt=${startAt}&maxResults=1000`;
+                let res;
+                let retries = 0;
+                const maxRetries = 5;
                 
-                if (!userDetailsCache[matchedTarget]) userDetailsCache[matchedTarget] = [];
-                userDetailsCache[matchedTarget].push({
-                  issueKey: issueKey,
-                  summary: iss.fields?.summary || '',
-                  hours: parseFloat(hours.toFixed(1)),
-                  comment: w.comment || '',
-                  time: w.started
-                });
+                while (retries < maxRetries) {
+                  res = await fetch(url, {
+                    method: "GET",
+                    headers: { "Authorization": authHeaderMon }
+                  });
+                  
+                  if (res.status === 429) {
+                    await sleep(3000);
+                    retries++;
+                  } else {
+                    break;
+                  }
+                }
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  const logs = data.worklogs || [];
+                  wls = wls.concat(logs);
+                  total = data.total ?? 0;
+                  if (logs.length === 0) break;
+                  startAt += logs.length;
+                } else {
+                  break;
+                }
+              }
+              return { issueKey, wls, summary: iss.fields?.summary || '' };
+            } catch (e) {
+              return { issueKey, wls: [], summary: iss.fields?.summary || '' };
+            }
+          }));
+          
+          results.push(...chunkResults);
+          
+          // 429 방지를 위해 청크 사이에 200ms 대기
+          if (i + chunkSize < issuesAll.length) {
+            await sleep(200);
+          }
+        }
+
+        for (const result of results) {
+          const { issueKey, wls, summary } = result;
+          for (const w of wls) {
+            const wlAuthorId = w.author?.name || "";
+            const wlAuthorName = w.author?.displayName || "";
+            
+            // DT 계정으로 먼저 매핑 시도, 없으면 표시이름으로 시도
+            const matchedTarget = dtToName[wlAuthorId] || targets.find(t => wlAuthorName.toLowerCase().includes(t.toLowerCase()));
+            
+            if (matchedTarget) {
+              // 한국 시간 기준으로 날짜 비교
+              if (w.started) {
+                const wlDate = new Date(w.started);
+                const wlKstDateStr = new Date(wlDate.getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+                
+                if (wlKstDateStr === todayStr) {
+                  const hours = (w.timeSpentSeconds || 0) / 3600;
+                  userDailyHoursCache[matchedTarget] = (userDailyHoursCache[matchedTarget] || 0) + hours;
+                  
+                  if (!userDetailsCache[matchedTarget]) userDetailsCache[matchedTarget] = [];
+                  userDetailsCache[matchedTarget].push({
+                    issueKey: issueKey,
+                    summary: summary,
+                    hours: parseFloat(hours.toFixed(1)),
+                    comment: w.comment || '',
+                    time: w.started
+                  });
+                }
               }
             }
           }

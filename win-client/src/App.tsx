@@ -10,6 +10,14 @@ function App() {
   const [isConnected, setIsConnected] = useState(false)
   const [leftWidth, setLeftWidth] = useState(50)
   const esRef = useRef<EventSource | null>(null)
+  const [elapsedTime, setElapsedTime] = useState(0)
+
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const startX = e.clientX;
@@ -199,6 +207,14 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 페이지 로딩 후 경과 시간 타이머
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const markAsRead = (id: number) => {
     setLogs(prev => prev.map(log => log.id === id ? { ...log, isRead: true } : log))
   }
@@ -301,8 +317,28 @@ function App() {
       {/* 상단 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
         <div>
-          <h2 style={{ color: '#60a5fa', margin: '0 0 5px 0' }}>🔔 JIRA 백그라운드 알림 클라이언트</h2>
-          <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>웹앱 서버와 연결하여 실시간으로 알림을 수신합니다. (최소화 시 트레이 숨김)</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '5px' }}>
+            <h2 style={{ color: '#60a5fa', margin: 0 }}>🔔 JIRA 백그라운드 알림 클라이언트</h2>
+            <div style={{ 
+              fontFamily: 'monospace', 
+              background: '#0f172a', 
+              color: '#10b981', 
+              padding: '4px 10px', 
+              borderRadius: '6px', 
+              border: '2px solid #10b981',
+              boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+              fontWeight: 'bold', 
+              fontSize: '1.1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              ⏱️ {formatTime(elapsedTime)}
+            </div>
+          </div>
+          <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>
+            웹앱 서버와 연결하여 실시간으로 알림을 수신합니다. (최소화 시 트레이 숨김)
+          </p>
         </div>
         
         <div style={{ display: 'flex', gap: '10px', minWidth: '300px' }}>
