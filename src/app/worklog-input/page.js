@@ -134,6 +134,7 @@ export default function WorklogInput() {
               summary: l.issueSummary,
               totalSeconds: 0,
               issueStatus: l.issueStatus,
+              issueType: l.issueType,
               link: jiraHost ? `${jiraHost}/browse/${l.issueKey}` : "",
               originalEstimate: l.originalEstimate || "-",
               issueTimeSpent: l.issueTimeSpent || "-"
@@ -147,6 +148,7 @@ export default function WorklogInput() {
         const processedIssues = sortedKeys.map(key => ({
           ...issueMap[key],
           isResolved: isDone(issueMap[key].issueStatus),
+          isSubTask: issueMap[key].issueType && (issueMap[key].issueType.toLowerCase().includes("sub") || issueMap[key].issueType.includes("하위")),
           totalHours: (issueMap[key].totalSeconds / 3600).toFixed(1)
         }));
 
@@ -244,18 +246,18 @@ export default function WorklogInput() {
               {recentIssues.map(issue => (
                 <button key={issue.key}
                   onClick={() => handleIssueSelect(issue)}
-                  title={issue.isResolved ? "완료된 이슈입니다. 세부 정보만 조회할 수 있습니다." : ""}
+                  title={`${issue.isSubTask ? "[Sub-task] " : ""}${issue.isResolved ? "완료된 이슈입니다. 세부 정보만 조회할 수 있습니다." : ""}`}
                   style={{
                     cursor: "pointer",
                     fontSize: "0.75rem", padding: "4px 10px",
                     background: issueKey === issue.key ? (issue.isResolved ? "#7f1d1d" : "var(--accent-color)") : (issue.isResolved ? "#222" : "#1a1a2e"),
-                    border: `1px solid ${issueKey === issue.key ? (issue.isResolved ? "#ef4444" : "var(--accent-color)") : (issue.isResolved ? "#333" : "#333")}`,
+                    border: `1px ${issue.isSubTask ? "dashed" : "solid"} ${issueKey === issue.key ? (issue.isResolved ? "#ef4444" : "var(--accent-color)") : (issue.isResolved ? "#333" : "#333")}`,
                     borderRadius: "6px",
                     color: issueKey === issue.key ? "white" : (issue.isResolved ? "#666" : "#ccc"),
                     transition: "all 0.2s",
                     textDecoration: issue.isResolved ? "line-through" : "none"
                   }}>
-                  {issue.key}
+                  {issue.isSubTask ? "↳ " : ""}{issue.key}
                 </button>
               ))}
             </div>
@@ -275,17 +277,22 @@ export default function WorklogInput() {
                     ) : "이슈 상세 정보를 불러올 수 없습니다."}
                   </div>
                   {selected && (
-                    <div style={{ marginTop: "0.75rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-                      <div style={{ background: "rgba(0,0,0,0.3)", padding: "0.6rem 1rem", borderRadius: "8px", border: "1px solid rgba(59,130,246,0.3)", display: "flex", flexDirection: "column", minWidth: "120px" }}>
-                        <span style={{ fontSize: "0.7rem", color: "#9ca3af", marginBottom: "0.2rem" }}>🎯 계획 시간 (Estimate)</span>
-                        <span style={{ fontSize: "1.1rem", color: "#60a5fa", fontWeight: "bold" }}>{selected.originalEstimate !== "-" ? selected.originalEstimate : "미정"}</span>
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginBottom: "0.5rem" }}>
+                        유형: <span style={{ color: selected.isSubTask ? "#60a5fa" : "#aaa" }}>{selected.issueType || "-"}</span>
                       </div>
-                      <div style={{ background: "rgba(0,0,0,0.3)", padding: "0.6rem 1rem", borderRadius: "8px", border: "1px solid rgba(16,185,129,0.3)", display: "flex", flexDirection: "column", minWidth: "120px" }}>
-                        <span style={{ fontSize: "0.7rem", color: "#9ca3af", marginBottom: "0.2rem" }}>⏳ 현재 총 작업시간 (Logged)</span>
-                        <span style={{ fontSize: "1.1rem", color: "#34d399", fontWeight: "bold" }}>{selected.issueTimeSpent !== "-" ? selected.issueTimeSpent : "0h"}</span>
-                      </div>
-                      <div style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "right" }}>
-                        🕒 (나의) 최근 30일 누적 공수: {selected.totalHours}h
+                      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+                        <div style={{ background: "rgba(0,0,0,0.3)", padding: "0.6rem 1rem", borderRadius: "8px", border: "1px solid rgba(59,130,246,0.3)", display: "flex", flexDirection: "column", minWidth: "120px" }}>
+                          <span style={{ fontSize: "0.7rem", color: "#9ca3af", marginBottom: "0.2rem" }}>🎯 계획 시간 (Estimate)</span>
+                          <span style={{ fontSize: "1.1rem", color: "#60a5fa", fontWeight: "bold" }}>{selected.originalEstimate !== "-" ? selected.originalEstimate : "미정"}</span>
+                        </div>
+                        <div style={{ background: "rgba(0,0,0,0.3)", padding: "0.6rem 1rem", borderRadius: "8px", border: "1px solid rgba(16,185,129,0.3)", display: "flex", flexDirection: "column", minWidth: "120px" }}>
+                          <span style={{ fontSize: "0.7rem", color: "#9ca3af", marginBottom: "0.2rem" }}>⏳ 현재 총 작업시간 (Logged)</span>
+                          <span style={{ fontSize: "1.1rem", color: "#34d399", fontWeight: "bold" }}>{selected.issueTimeSpent !== "-" ? selected.issueTimeSpent : "0h"}</span>
+                        </div>
+                        <div style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "right" }}>
+                          🕒 (나의) 최근 30일 누적 공수: {selected.totalHours}h
+                        </div>
                       </div>
                     </div>
                   )}
