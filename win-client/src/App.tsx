@@ -2,7 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 function App() {
-  const [logs, setLogs] = useState<any[]>([])
+  const [logs, setLogs] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('noti_logs');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  })
   const [userStats, setUserStats] = useState<Record<string, number>>({})
   const [userDetails, setUserDetails] = useState<Record<string, any[]>>({})
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
@@ -207,6 +214,11 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 로그가 변경될 때마다 localStorage에 저장
+  useEffect(() => {
+    localStorage.setItem('noti_logs', JSON.stringify(logs));
+  }, [logs]);
+
   // 페이지 로딩 후 경과 시간 타이머
   useEffect(() => {
     const timer = setInterval(() => {
@@ -301,7 +313,22 @@ function App() {
   const renderDonut = (hours: number) => {
     const max = 8;
     const pct = Math.min((hours / max) * 100, 100);
-    const color = pct >= 100 ? '#10b981' : '#3b82f6';
+    
+    // 8시간 기준 5단계 파스텔톤 색상 구분
+    let color = '#bbf7d0'; // 기본: 기준 달성 (7.5h ~ 8.5h) - 파스텔 녹색
+    
+    if (hours < 4) {
+      color = '#dc2626'; // 1단계: 매우 미달 (0h ~ 4h) - Vivid Red
+    } else if (hours < 7.5) {
+      color = '#f97316'; // 2단계: 미달 (4h ~ 7.5h) - Vivid Orange
+    } else if (hours <= 8.5) {
+      color = '#16a34a'; // 3단계: 기준 (7.5h ~ 8.5h) - Vivid Green
+    } else if (hours <= 10) {
+      color = '#a3e635'; // 4단계: 초과 (8.5h ~ 10h) - Lime (연두색/중간색)
+    } else {
+      color = '#facc15'; // 5단계: 매우 초과 (10h 이상) - Vivid Yellow
+    }
+    
     const conic = `conic-gradient(${color} ${pct}%, #334155 0)`;
     
     return (
@@ -362,26 +389,56 @@ function App() {
         <h4 style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '0.95rem' }}>👥 작업자별 누적 시간 (Today) - 클릭 시 상세 보기</h4>
         {Object.keys(userStats).length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
-            {Object.entries(userStats).map(([name, hours]) => (
-              <div 
-                key={name} 
-                onClick={() => setSelectedUser(name)}
-                style={{ 
-                  background: selectedUser === name ? '#334155' : '#0f172a', 
-                  padding: '8px', 
-                  borderRadius: '6px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '10px', 
-                  border: selectedUser === name ? '2px solid #3b82f6' : '1px solid #334155',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {renderDonut(hours)}
-                <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#cbd5e1' }}>{name}</div>
-              </div>
-            ))}
+            {Object.entries(userStats).map(([name, hours]) => {
+              // 해당 작업자의 미확인 위반 알림이 있는지 확인
+              const hasUnreadAlert = logs.some(log => 
+                !log.isRead && 
+                ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType) &&
+                (log.author === name || log.author?.includes(name))
+              );
+
+              return (
+                <div 
+                  key={name} 
+                  onClick={() => setSelectedUser(name)}
+                  style={{ 
+                    background: selectedUser === name ? '#334155' : '#0f172a', 
+                    padding: '8px', 
+                    borderRadius: '6px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '10px', 
+                    border: selectedUser === name ? '2px solid #3b82f6' : '1px solid #334155',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    position: 'relative'
+                  }}
+                >
+                  {hasUnreadAlert && (
+                    <span style={{ 
+                      position: 'absolute', 
+                      top: '-5px', 
+                      right: '-5px', 
+                      background: '#ef4444', 
+                      color: 'white', 
+                      borderRadius: '50%', 
+                      width: '18px', 
+                      height: '18px', 
+                      fontSize: '0.7rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      fontWeight: 'bold',
+                      boxShadow: '0 0 5px rgba(239, 68, 68, 0.5)'
+                    }}>
+                      !
+                    </span>
+                  )}
+                  {renderDonut(hours)}
+                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#cbd5e1' }}>{name}</div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div style={{ color: '#555', fontSize: '0.9rem' }}>
@@ -403,8 +460,9 @@ function App() {
               </span>
             </h4>
             <button 
-              onClick={() => setLogs([])}
+              onClick={() => setLogs(prev => prev.filter(log => !log.isRead))}
               style={{ padding: '4px 10px', background: '#334155', color: '#ccc', border: '1px solid #475569', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+              title="확인된 알림만 지웁니다."
             >
               🧹 비우기
             </button>
