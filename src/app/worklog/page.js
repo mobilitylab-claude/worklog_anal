@@ -4,19 +4,19 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { getJiraAuthHeaders } from "@/lib/jiraAuthClient";
 
 const AVAILABLE_COLUMNS = [
-  { id: "started",     label: "작업 일시",      width: "11%" },
-  { id: "issueKey",    label: "이슈 번호",      width: "8%"  },
-  { id: "issueType",   label: "이슈 유형",      width: "7%"  },
-  { id: "issueSummary",label: "이슈 요약",      width: "15%" },
-  { id: "issueStatus", label: "이슈 상태",      width: "6%"  },
-  { id: "issueStartDate", label: "시작일",      width: "7%"  },
-  { id: "dueDate",     label: "기한",           width: "7%"  },
-  { id: "originalEstimate", label: "예상 시간", width: "6%"  },
-  { id: "remainingEstimate", label: "남은 시간", width: "6%"  },
-  { id: "issueTimeSpent", label: "기록된 시간", width: "6%"  },
-  { id: "author",      label: "작업자",         width: "8%"  },
-  { id: "timeSpent",   label: "소요시간",       width: "7%"  },
-  { id: "comment",     label: "작업 내용",      width: "20%" },
+  { id: "started", label: "작업 일시", width: "11%" },
+  { id: "issueKey", label: "이슈 번호", width: "8%" },
+  { id: "issueType", label: "이슈 유형", width: "7%" },
+  { id: "issueSummary", label: "이슈 요약", width: "15%" },
+  { id: "issueStatus", label: "이슈 상태", width: "6%" },
+  { id: "issueStartDate", label: "시작일", width: "7%" },
+  { id: "dueDate", label: "기한", width: "7%" },
+  { id: "originalEstimate", label: "예상 시간", width: "6%" },
+  { id: "remainingEstimate", label: "남은 시간", width: "6%" },
+  { id: "issueTimeSpent", label: "기록된 시간", width: "6%" },
+  { id: "author", label: "작업자", width: "8%" },
+  { id: "timeSpent", label: "소요시간", width: "7%" },
+  { id: "comment", label: "작업 내용", width: "20%" },
 ];
 
 export default function WorklogAnalyzer() {
@@ -28,43 +28,43 @@ export default function WorklogAnalyzer() {
   })();
 
   const [startDate, setStartDate] = useState(yesterday);
-  const [endDate,   setEndDate]   = useState(yesterday);
+  const [endDate, setEndDate] = useState(yesterday);
 
   // ── 검색 조건 ──────────────────────────────────────────────────
   const [includeKeyword, setIncludeKeyword] = useState("");
   const [excludeKeyword, setExcludeKeyword] = useState("");
-  const [targetMode,     setTargetMode]     = useState("me");
+  const [targetMode, setTargetMode] = useState("me");
   const [selectedGroups, setSelectedGroups] = useState([]);
-  const [selectedUsers,  setSelectedUsers]  = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
 
   // ── 사용자 목록 (DB) ───────────────────────────────────────────
   const [dbUsers, setDbUsers] = useState([]);
 
   // ── JQL 관리 ──────────────────────────────────────────────────
-  const [jqlValue,    setJqlValue]    = useState("");
+  const [jqlValue, setJqlValue] = useState("");
   const [isManualJql, setIsManualJql] = useState(false);
 
   // ── 결과 / 상태 ────────────────────────────────────────────────
-  const [worklogs,      setWorklogs]      = useState([]);
-  const [jiraHost,      setJiraHost]      = useState("");
-  const [usedJql,       setUsedJql]       = useState("");
-  const [debugLog,      setDebugLog]      = useState([]);
-  const [totalIssues,   setTotalIssues]   = useState(0);
-  const [showDebug,     setShowDebug]     = useState(false);
+  const [worklogs, setWorklogs] = useState([]);
+  const [jiraHost, setJiraHost] = useState("");
+  const [usedJql, setUsedJql] = useState("");
+  const [debugLog, setDebugLog] = useState([]);
+  const [totalIssues, setTotalIssues] = useState(0);
+  const [showDebug, setShowDebug] = useState(false);
 
   // ── 로딩 / 진행 ────────────────────────────────────────────────
-  const [loading,        setLoading]        = useState(false);
+  const [loading, setLoading] = useState(false);
   const [searchProgress, setSearchProgress] = useState(0);
-  const [statusMsg,      setStatusMsg]      = useState("");
+  const [statusMsg, setStatusMsg] = useState("");
   const progressTimerRef = useRef(null);
 
   // ── UI 제어 ────────────────────────────────────────────────────
-  const [filterAuthor,       setFilterAuthor]       = useState(null);
-  const [filterProjectCode,  setFilterProjectCode]  = useState(null);
-  const [filterWorkType,     setFilterWorkType]     = useState(null);
-  const [showCharts,         setShowCharts]         = useState(true);
+  const [filterAuthor, setFilterAuthor] = useState(null);
+  const [filterProjectCode, setFilterProjectCode] = useState(null);
+  const [filterWorkType, setFilterWorkType] = useState(null);
+  const [showCharts, setShowCharts] = useState(true);
   const [showColumnConfig, setShowColumnConfig] = useState(false);
-  const [visibleColumns,   setVisibleColumns]   = useState(AVAILABLE_COLUMNS.map(c => c.id));
+  const [visibleColumns, setVisibleColumns] = useState(AVAILABLE_COLUMNS.map(c => c.id));
 
   // ── 초기 사용자 목록 로드 ──────────────────────────────────────
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function WorklogAnalyzer() {
   useEffect(() => {
     if (isManualJql) return;
 
-    const endDateObj  = new Date(endDate);
+    const endDateObj = new Date(endDate);
     endDateObj.setDate(endDateObj.getDate() + 1);
     const endDateNext = endDateObj.toISOString().split("T")[0];
 
@@ -212,29 +212,29 @@ export default function WorklogAnalyzer() {
       // 시트1: 상세 내역
       const detail = filteredWorklogs.map(w => {
         const row = {};
-        if (visibleColumns.includes("started"))      row["작업 일시"]  = new Date(w.started).toLocaleString("ko-KR");
-        if (visibleColumns.includes("issueKey"))     row["이슈 키"]    = w.issueKey;
-        if (visibleColumns.includes("issueType"))    row["이슈 유형"]  = w.issueType;
-        if (visibleColumns.includes("issueSummary")) row["이슈 요약"]  = w.issueSummary;
-        if (visibleColumns.includes("issueStatus"))  row["이슈 상태"]  = w.issueStatus;
+        if (visibleColumns.includes("started")) row["작업 일시"] = new Date(w.started).toLocaleString("ko-KR");
+        if (visibleColumns.includes("issueKey")) row["이슈 키"] = w.issueKey;
+        if (visibleColumns.includes("issueType")) row["이슈 유형"] = w.issueType;
+        if (visibleColumns.includes("issueSummary")) row["이슈 요약"] = w.issueSummary;
+        if (visibleColumns.includes("issueStatus")) row["이슈 상태"] = w.issueStatus;
         if (visibleColumns.includes("issueStartDate")) row["시작일"] = w.issueStartDate;
-        if (visibleColumns.includes("dueDate"))      row["기한"]       = w.dueDate;
+        if (visibleColumns.includes("dueDate")) row["기한"] = w.dueDate;
         if (visibleColumns.includes("originalEstimate")) row["예상 시간"] = w.originalEstimate;
         if (visibleColumns.includes("remainingEstimate")) row["남은 시간"] = w.remainingEstimate;
         if (visibleColumns.includes("issueTimeSpent")) row["기록된 시간"] = w.issueTimeSpent;
-        if (visibleColumns.includes("author"))       row["작업자"]     = w.author;
-        if (visibleColumns.includes("timeSpent"))    row["소요 시간(h)"]  = w.timeSpent;
-        if (visibleColumns.includes("timeSpent"))    row["원본 시간"]     = w.timeSpentRaw || w.timeSpent;
-        if (visibleColumns.includes("comment"))      row["작업 내용"]  = w.comment;
+        if (visibleColumns.includes("author")) row["작업자"] = w.author;
+        if (visibleColumns.includes("timeSpent")) row["소요 시간(h)"] = w.timeSpent;
+        if (visibleColumns.includes("timeSpent")) row["원본 시간"] = w.timeSpentRaw || w.timeSpent;
+        if (visibleColumns.includes("comment")) row["작업 내용"] = w.comment;
         return row;
       });
       const ws1 = xlsx.utils.json_to_sheet(detail);
-      ws1["!cols"] = [{ wch:18 },{ wch:12 },{ wch:12 },{ wch:40 },{ wch:12 },{ wch:15 },{ wch:12 },{ wch:80 }];
+      ws1["!cols"] = [{ wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 80 }];
       xlsx.utils.book_append_sheet(wb, ws1, "1. 작업 내역 상세");
 
       // 시트2: 월별
-      const ws2 = xlsx.utils.json_to_sheet(statsByMonth.map(s => ({ 
-        "연월": s.label, 
+      const ws2 = xlsx.utils.json_to_sheet(statsByMonth.map(s => ({
+        "연월": s.label,
         "MM": parseFloat(s.value),
         "총 시간(H)": parseFloat(s.hours)
       })));
@@ -242,8 +242,110 @@ export default function WorklogAnalyzer() {
       xlsx.utils.book_append_sheet(wb, ws2, "2. 월별 통계");
 
       // 시트3: 작업자별
-      const ws3 = xlsx.utils.json_to_sheet(statsByUser.map(s => ({ "작업자": s.label, "누적 시간(H)": parseFloat(s.value) })));
-      ws3["!cols"] = [{ wch: 20 }, { wch: 15 }];
+      const allProjectCodes = Array.from(new Set(worklogs.map(w => w.projectCode || "미지정"))).sort();
+      const userStatsRows = statsByUser.map(s => {
+        const authorName = s.label;
+        const totalHours = parseFloat(s.value);
+
+        const dbUser = dbUsers.find(u =>
+          authorName === u.name ||
+          authorName.startsWith(u.name) ||
+          u.name.startsWith(authorName)
+        );
+        const groupName = dbUser ? (dbUser.part || "미지정") : "미지정";
+
+        const row = {
+          "작업자": authorName,
+          "분석대상 그룹": groupName,
+          "누적 시간(H)": totalHours
+        };
+
+        allProjectCodes.forEach(pc => {
+          const secondsForProject = worklogs
+            .filter(w => {
+              const isAuthorMatch = w.author === authorName ||
+                w.author.startsWith(authorName) ||
+                authorName.startsWith(w.author);
+              const wPc = w.projectCode || "미지정";
+              return isAuthorMatch && wPc === pc;
+            })
+            .reduce((sum, w) => sum + (w.timeSpentSeconds || 0), 0);
+
+          row[pc] = parseFloat((secondsForProject / 3600).toFixed(1));
+        });
+
+        return row;
+      });
+
+      // 그룹별 분류 및 정렬
+      const groupsMap = {};
+      userStatsRows.forEach(row => {
+        const g = row["분석대상 그룹"];
+        if (!groupsMap[g]) groupsMap[g] = [];
+        groupsMap[g].push(row);
+      });
+
+      const sortedGroupNames = Object.keys(groupsMap).sort((a, b) => {
+        if (a === "미지정" && b !== "미지정") return 1;
+        if (a !== "미지정" && b === "미지정") return -1;
+        return a.localeCompare(b);
+      });
+
+      const finalRows = [];
+      const totalProjectHours = {};
+      allProjectCodes.forEach(pc => { totalProjectHours[pc] = 0; });
+      let overallTotalHours = 0;
+
+      sortedGroupNames.forEach(groupName => {
+        const groupRows = groupsMap[groupName];
+
+        // 그룹 내에서는 누적 시간(H) 내림차순 정렬
+        groupRows.sort((a, b) => b["누적 시간(H)"] - a["누적 시간(H)"]);
+
+        // 작업자 행 추가
+        finalRows.push(...groupRows);
+
+        // 소계 계산
+        const subTotalHours = groupRows.reduce((sum, r) => sum + r["누적 시간(H)"], 0);
+        const subTotalProjects = {};
+        allProjectCodes.forEach(pc => {
+          subTotalProjects[pc] = groupRows.reduce((sum, r) => sum + (r[pc] || 0), 0);
+          totalProjectHours[pc] += subTotalProjects[pc];
+        });
+        overallTotalHours += subTotalHours;
+
+        // 소계 행 추가
+        const subTotalRow = {
+          "작업자": `[소계] ${groupName} 누적계`,
+          "분석대상 그룹": groupName,
+          "누적 시간(H)": parseFloat(subTotalHours.toFixed(1))
+        };
+        allProjectCodes.forEach(pc => {
+          subTotalRow[pc] = parseFloat(subTotalProjects[pc].toFixed(1));
+        });
+
+        finalRows.push(subTotalRow);
+      });
+
+      // 전체 총계 행 추가
+      const totalRow = {
+        "작업자": "[총계] 전체 합계",
+        "분석대상 그룹": "-",
+        "누적 시간(H)": parseFloat(overallTotalHours.toFixed(1))
+      };
+      allProjectCodes.forEach(pc => {
+        totalRow[pc] = parseFloat(totalProjectHours[pc].toFixed(1));
+      });
+      finalRows.push(totalRow);
+
+      const ws3 = xlsx.utils.json_to_sheet(finalRows);
+      const colWidths = [
+        { wch: 25 }, // 작업자
+        { wch: 18 }, // 분석대상 그룹
+        { wch: 15 }, // 누적 시간(H)
+        ...allProjectCodes.map(() => ({ wch: 15 })) // 프로젝트 코드들
+      ];
+      ws3["!cols"] = colWidths;
       xlsx.utils.book_append_sheet(wb, ws3, "3. 작업자별 통계");
 
       xlsx.writeFile(wb, `Jira_Worklog_${startDate}_to_${endDate}.xlsx`);
@@ -282,8 +384,8 @@ export default function WorklogAnalyzer() {
     return Object.entries(map).sort().map(([k, v]) => {
       const hours = v / 3600;
       const mm = hours / 8 / 20.5;
-      return { 
-        label: k, 
+      return {
+        label: k,
         value: mm.toFixed(3), // MM은 정밀도를 위해 소수점 3자리
         hours: hours.toFixed(1)
       };
@@ -371,7 +473,7 @@ export default function WorklogAnalyzer() {
     });
 
     const overdueEstimate = issues.filter(i => {
-      if (isDone(i.issueStatus)) return false; 
+      if (isDone(i.issueStatus)) return false;
       // originalEstimate must be set and issueTimeSpent > originalEstimate
       return i.originalEstimate > 0 && i.issueTimeSpent > i.originalEstimate;
     });
@@ -433,7 +535,7 @@ export default function WorklogAnalyzer() {
             </div>
             <div style={{ fontWeight: "bold", fontSize: "1.1rem", color: "#10b981" }}>{searchProgress}%</div>
             <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#555" }}>
-              이슈 전체 페이지네이션 + 워크로그 순차 수집 중.<br/>데이터량에 따라 수 분이 소요될 수 있습니다.
+              이슈 전체 페이지네이션 + 워크로그 순차 수집 중.<br />데이터량에 따라 수 분이 소요될 수 있습니다.
             </p>
           </div>
         </div>
@@ -549,7 +651,7 @@ export default function WorklogAnalyzer() {
             const type = prompt("자동 리포트 주기를 입력하세요 (daily 또는 monthly):", "daily");
             if (type !== "daily" && type !== "monthly") return;
             if (!confirm(`현재 참여자 필터 조건으로 '${type}' 자동 리포트를 등록하시겠습니까?\n(daily: 매일 전날 작업기록, monthly: 매월 말일 해당 월 작업기록)`)) return;
-            
+
             let tData = [];
             if (targetMode === "group") tData = dbUsers.filter(u => selectedGroups.includes(u.part));
             else if (targetMode === "individual") tData = dbUsers.filter(u => selectedUsers.includes(u.id));
@@ -622,21 +724,21 @@ export default function WorklogAnalyzer() {
                   <h3 style={{ fontSize: "0.9rem", color: "gray", marginBottom: "1rem" }}>📅 월별 실적</h3>
                   {(() => {
                     const BAR_W = 44;
-                    const GAP   = 16;
-                    const H     = 200;
+                    const GAP = 16;
+                    const H = 200;
                     const PAD_L = 44;
                     const PAD_B = 36;
                     const PAD_T = 20;
-                    const n     = statsByMonth.length;
-                    const W     = PAD_L + n * BAR_W + (n - 1) * GAP + 24;
+                    const n = statsByMonth.length;
+                    const W = PAD_L + n * BAR_W + (n - 1) * GAP + 24;
                     const maxVal = Math.max(...statsByMonth.map(x => parseFloat(x.value)), 1);
                     // 눈금선 개수
                     const gridLines = 4;
 
                     // 각 막대 x 중심
                     const barCx = (i) => PAD_L + i * (BAR_W + GAP) + BAR_W / 2;
-                    const barH  = (v) => ((v / maxVal) * (H - PAD_T - PAD_B));
-                    const barY  = (v) => H - PAD_B - barH(v);
+                    const barH = (v) => ((v / maxVal) * (H - PAD_T - PAD_B));
+                    const barY = (v) => H - PAD_B - barH(v);
 
                     // 추이선 포인트
                     const points = statsByMonth.map((s, i) =>
@@ -668,10 +770,10 @@ export default function WorklogAnalyzer() {
 
                           {/* 막대 */}
                           {statsByMonth.map((s, i) => {
-                            const val  = parseFloat(s.value);
-                            const bh   = barH(val);
-                            const bx   = PAD_L + i * (BAR_W + GAP);
-                            const by   = barY(val);
+                            const val = parseFloat(s.value);
+                            const bh = barH(val);
+                            const bx = PAD_L + i * (BAR_W + GAP);
+                            const by = barY(val);
                             return (
                               <g key={s.label}>
                                 {/* 막대 그라데이션 */}
@@ -709,7 +811,7 @@ export default function WorklogAnalyzer() {
                               <defs>
                                 <filter id="glow">
                                   <feGaussianBlur stdDeviation="2" result="blur" />
-                                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                  <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                                 </filter>
                               </defs>
                               <polyline
@@ -759,21 +861,21 @@ export default function WorklogAnalyzer() {
                         gap: "0.65rem",
                       }}>
                         {statsByUser.map(s => {
-                          const val    = parseFloat(s.value);
+                          const val = parseFloat(s.value);
                           const active = filterAuthor === s.label;
-                          const under  = val < THRESHOLD;
-                          const pct    = (val / maxVal) * 100;
+                          const under = val < THRESHOLD;
+                          const pct = (val / maxVal) * 100;
 
                           // 색상 팔레트
-                          const barColor   = under ? (val < 4 ? "#ef4444" : "#f97316") : "#10b981";
-                          const glowColor  = under ? (val < 4 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)") : "rgba(16,185,129,0.15)";
-                          const textColor  = under ? (val < 4 ? "#f87171" : "#fb923c") : "#34d399";
-                          const borderClr  = active
+                          const barColor = under ? (val < 4 ? "#ef4444" : "#f97316") : "#10b981";
+                          const glowColor = under ? (val < 4 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)") : "rgba(16,185,129,0.15)";
+                          const textColor = under ? (val < 4 ? "#f87171" : "#fb923c") : "#34d399";
+                          const borderClr = active
                             ? "var(--accent-color)"
                             : under
                               ? (val < 4 ? "rgba(239,68,68,0.5)" : "rgba(249,115,22,0.4)")
                               : "transparent";
-                          const bgColor    = active
+                          const bgColor = active
                             ? "rgba(59,130,246,0.15)"
                             : under
                               ? (val < 4 ? "rgba(239,68,68,0.07)" : "rgba(249,115,22,0.07)")
@@ -854,21 +956,22 @@ export default function WorklogAnalyzer() {
                     {statsByProjectCode.map(s => {
                       const active = filterProjectCode === s.label;
                       return (
-                      <div key={s.label} 
-                        onClick={() => setFilterProjectCode(active ? null : s.label)}
-                        style={{ 
-                          background: active ? "rgba(16, 185, 129, 0.15)" : "rgba(255,255,255,0.03)", 
-                          border: active ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.05)", 
-                          borderRadius: "8px", padding: "0.5rem 0.8rem", display: "flex", gap: "0.5rem", alignItems: "center", cursor: "pointer",
-                          boxShadow: active ? "0 0 8px rgba(16, 185, 129, 0.2)" : "none",
-                          transition: "all 0.2s"
-                        }}>
-                        <span style={{ fontSize: "0.8rem", color: active ? "white" : "#ccc", fontWeight: active ? "bold" : "normal" }}>
-                          {active ? "✅ " : ""}{s.label}
-                        </span>
-                        <span style={{ fontSize: "0.9rem", color: "#10b981", fontWeight: "bold" }}>{s.value}h</span>
-                      </div>
-                    )})}
+                        <div key={s.label}
+                          onClick={() => setFilterProjectCode(active ? null : s.label)}
+                          style={{
+                            background: active ? "rgba(16, 185, 129, 0.15)" : "rgba(255,255,255,0.03)",
+                            border: active ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.05)",
+                            borderRadius: "8px", padding: "0.5rem 0.8rem", display: "flex", gap: "0.5rem", alignItems: "center", cursor: "pointer",
+                            boxShadow: active ? "0 0 8px rgba(16, 185, 129, 0.2)" : "none",
+                            transition: "all 0.2s"
+                          }}>
+                          <span style={{ fontSize: "0.8rem", color: active ? "white" : "#ccc", fontWeight: active ? "bold" : "normal" }}>
+                            {active ? "✅ " : ""}{s.label}
+                          </span>
+                          <span style={{ fontSize: "0.9rem", color: "#10b981", fontWeight: "bold" }}>{s.value}h</span>
+                        </div>
+                      )
+                    })}
                     {statsByProjectCode.length === 0 && <div style={{ fontSize: "0.8rem", color: "#666" }}>데이터 없음</div>}
                   </div>
                 </div>
@@ -880,21 +983,22 @@ export default function WorklogAnalyzer() {
                     {statsByWorkType.map(s => {
                       const active = filterWorkType === s.label;
                       return (
-                      <div key={s.label} 
-                        onClick={() => setFilterWorkType(active ? null : s.label)}
-                        style={{ 
-                          background: active ? "rgba(59, 130, 246, 0.15)" : "rgba(255,255,255,0.03)", 
-                          border: active ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.05)", 
-                          borderRadius: "8px", padding: "0.5rem 0.8rem", display: "flex", gap: "0.5rem", alignItems: "center", cursor: "pointer",
-                          boxShadow: active ? "0 0 8px rgba(59, 130, 246, 0.2)" : "none",
-                          transition: "all 0.2s"
-                        }}>
-                        <span style={{ fontSize: "0.8rem", color: active ? "white" : "#ccc", fontWeight: active ? "bold" : "normal" }}>
-                          {active ? "✅ " : ""}{s.label}
-                        </span>
-                        <span style={{ fontSize: "0.9rem", color: "#3b82f6", fontWeight: "bold" }}>{s.value}h</span>
-                      </div>
-                    )})}
+                        <div key={s.label}
+                          onClick={() => setFilterWorkType(active ? null : s.label)}
+                          style={{
+                            background: active ? "rgba(59, 130, 246, 0.15)" : "rgba(255,255,255,0.03)",
+                            border: active ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.05)",
+                            borderRadius: "8px", padding: "0.5rem 0.8rem", display: "flex", gap: "0.5rem", alignItems: "center", cursor: "pointer",
+                            boxShadow: active ? "0 0 8px rgba(59, 130, 246, 0.2)" : "none",
+                            transition: "all 0.2s"
+                          }}>
+                          <span style={{ fontSize: "0.8rem", color: active ? "white" : "#ccc", fontWeight: active ? "bold" : "normal" }}>
+                            {active ? "✅ " : ""}{s.label}
+                          </span>
+                          <span style={{ fontSize: "0.9rem", color: "#3b82f6", fontWeight: "bold" }}>{s.value}h</span>
+                        </div>
+                      )
+                    })}
                     {statsByWorkType.length === 0 && <div style={{ fontSize: "0.8rem", color: "#666" }}>데이터 없음</div>}
                   </div>
                 </div>
@@ -998,8 +1102,8 @@ export default function WorklogAnalyzer() {
               <tbody>
                 {filteredWorklogs.map(w => (
                   <tr key={`${w.id}-${w.issueKey}`}>
-                    {visibleColumns.includes("started")      && <td style={{ whiteSpace: "nowrap" }}>{new Date(w.started).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}</td>}
-                    {visibleColumns.includes("issueKey")     && (
+                    {visibleColumns.includes("started") && <td style={{ whiteSpace: "nowrap" }}>{new Date(w.started).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}</td>}
+                    {visibleColumns.includes("issueKey") && (
                       <td style={{ whiteSpace: "nowrap" }}>
                         {jiraHost ? (
                           <a href={`${jiraHost}/browse/${w.issueKey}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-color)", fontWeight: "bold" }}>
@@ -1008,22 +1112,22 @@ export default function WorklogAnalyzer() {
                         ) : w.issueKey}
                       </td>
                     )}
-                    {visibleColumns.includes("issueType")    && <td>{w.issueType}</td>}
+                    {visibleColumns.includes("issueType") && <td>{w.issueType}</td>}
                     {visibleColumns.includes("issueSummary") && <td style={{ fontSize: "0.8rem" }}>{w.issueSummary}</td>}
-                    {visibleColumns.includes("issueStatus")  && <td>{w.issueStatus}</td>}
+                    {visibleColumns.includes("issueStatus") && <td>{w.issueStatus}</td>}
                     {visibleColumns.includes("issueStartDate") && <td>{w.issueStartDate}</td>}
-                    {visibleColumns.includes("dueDate")        && <td>{w.dueDate}</td>}
+                    {visibleColumns.includes("dueDate") && <td>{w.dueDate}</td>}
                     {visibleColumns.includes("originalEstimate") && <td>{w.originalEstimate}</td>}
                     {visibleColumns.includes("remainingEstimate") && <td>{w.remainingEstimate}</td>}
                     {visibleColumns.includes("issueTimeSpent") && <td>{w.issueTimeSpent}</td>}
-                    {visibleColumns.includes("author")       && <td style={{ fontWeight: "bold" }}>{w.author}</td>}
-                    {visibleColumns.includes("timeSpent")    && <td style={{ color: "#10b981", whiteSpace: "nowrap", fontWeight: "bold" }}>
+                    {visibleColumns.includes("author") && <td style={{ fontWeight: "bold" }}>{w.author}</td>}
+                    {visibleColumns.includes("timeSpent") && <td style={{ color: "#10b981", whiteSpace: "nowrap", fontWeight: "bold" }}>
                       {w.timeSpent}
                       {w.timeSpentRaw && w.timeSpentRaw !== w.timeSpent && (
                         <span style={{ color: "#555", fontSize: "0.75rem", marginLeft: "0.3rem" }}>({w.timeSpentRaw})</span>
                       )}
                     </td>}
-                    {visibleColumns.includes("comment")      && (
+                    {visibleColumns.includes("comment") && (
                       <td style={{ fontSize: "0.82rem", whiteSpace: "pre-wrap" }}>
                         {renderComment(w.comment)}
                       </td>

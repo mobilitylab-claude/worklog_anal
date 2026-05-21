@@ -165,7 +165,7 @@ export async function POST(request) {
 
     // ── 2. 이슈 전체 페이지네이션 수집 (공용 클라이언트 사용) ───────────
     debugLog.push("[이슈 수집] 시작 (전체 수집 모드)");
-    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "assignee"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
+    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "updated", "assignee"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
     debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈 로드 완료`);
 
     // ── 3. 이슈별 워크로그 순차 수집 + 2차 필터 ─────────────────
@@ -325,6 +325,8 @@ export async function POST(request) {
           remainingEstimateSeconds: issue.fields.timetracking?.remainingEstimateSeconds || 0,
           issueTimeSpentSeconds: issue.fields.timetracking?.timeSpentSeconds || 0,
           issueStartDate:  issueStartDate,
+          createDate:      issue.fields.created ? issue.fields.created.split("T")[0] : "-",
+          updateDate:      issue.fields.updated ? issue.fields.updated.split("T")[0] : "-",
           dueDate:         issue.fields.duedate || "-",
           assignee:        issue.fields.assignee?.displayName || issue.fields.assignee?.name || "Unassigned",
         });

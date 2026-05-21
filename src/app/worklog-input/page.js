@@ -137,7 +137,11 @@ export default function WorklogInput() {
               issueType: l.issueType,
               link: jiraHost ? `${jiraHost}/browse/${l.issueKey}` : "",
               originalEstimate: l.originalEstimate || "-",
-              issueTimeSpent: l.issueTimeSpent || "-"
+              issueTimeSpent: l.issueTimeSpent || "-",
+              dueDate: l.dueDate || "-",
+              createDate: l.createDate || "-",
+              updateDate: l.updateDate || "-",
+              issueStartDate: l.issueStartDate || "-"
             };
           }
           issueMap[l.issueKey].totalSeconds += (l.timeSpentSeconds || 0);
@@ -278,9 +282,27 @@ export default function WorklogInput() {
                   </div>
                   {selected && (
                     <div style={{ marginTop: "0.75rem" }}>
-                      <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginBottom: "0.5rem" }}>
-                        유형: <span style={{ color: selected.isSubTask ? "#60a5fa" : "#aaa" }}>{selected.issueType || "-"}</span>
+                      <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginBottom: "0.5rem", display: "flex", gap: "1rem" }}>
+                        <div>유형: <span style={{ color: selected.isSubTask ? "#60a5fa" : "#aaa" }}>{selected.issueType || "-"}</span></div>
+                        <div>상태: <span style={{ color: selected.isResolved ? "#10b981" : "#f59e0b" }}>{selected.issueStatus || "-"}</span></div>
                       </div>
+                      
+                      {/* 일정 정보 */}
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem", fontSize: "0.75rem" }}>
+                        <div style={{ background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: "4px", border: "1px solid #333" }}>
+                          <span style={{ color: "#888" }}>생성:</span> <span style={{ color: "#ccc" }}>{selected.createDate || "-"}</span>
+                        </div>
+                        <div style={{ background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: "4px", border: "1px solid #333" }}>
+                          <span style={{ color: "#888" }}>수정:</span> <span style={{ color: "#ccc" }}>{selected.updateDate || "-"}</span>
+                        </div>
+                        <div style={{ background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: "4px", border: "1px solid #333" }}>
+                          <span style={{ color: "#888" }}>시작:</span> <span style={{ color: "#ccc" }}>{selected.issueStartDate || "-"}</span>
+                        </div>
+                        <div style={{ background: "rgba(239,68,68,0.1)", padding: "4px 8px", borderRadius: "4px", border: "1px solid rgba(239,68,68,0.3)" }}>
+                          <span style={{ color: "#ef4444" }}>기한:</span> <span style={{ color: "#ef4444", fontWeight: "bold" }}>{selected.dueDate || "-"}</span>
+                        </div>
+                      </div>
+
                       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
                         <div style={{ background: "rgba(0,0,0,0.3)", padding: "0.6rem 1rem", borderRadius: "8px", border: "1px solid rgba(59,130,246,0.3)", display: "flex", flexDirection: "column", minWidth: "120px" }}>
                           <span style={{ fontSize: "0.7rem", color: "#9ca3af", marginBottom: "0.2rem" }}>🎯 계획 시간 (Estimate)</span>
