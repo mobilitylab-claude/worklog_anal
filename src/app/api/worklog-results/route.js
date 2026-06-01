@@ -15,19 +15,21 @@ export async function GET(request) {
     const params = [];
     
     if (type) {
-      whereClause = ` WHERE report_type = ?`;
+      whereClause = ` WHERE r.report_type = ?`;
       params.push(type);
     }
     
     // Total count for pagination
-    const countQuery = `SELECT COUNT(*) as total FROM worklog_results${whereClause}`;
+    const countQuery = `SELECT COUNT(*) as total FROM worklog_results r${whereClause}`;
     const totalCount = db.prepare(countQuery).get(...params).total;
 
     // Paginated results
-    const query = `SELECT id, target_date, report_type, total_hours, created_at, report_data_json 
-                   FROM worklog_results 
+    const query = `SELECT r.id, r.schedule_id, r.report_type, r.target_date, r.total_hours, r.created_at, r.report_data_json,
+                          COALESCE(r.target_users_json, s.target_users_json) as target_users_json
+                   FROM worklog_results r
+                   LEFT JOIN worklog_schedules s ON r.schedule_id = s.id
                    ${whereClause} 
-                   ORDER BY created_at DESC 
+                   ORDER BY r.created_at DESC 
                    LIMIT ? OFFSET ?`;
     
     const results = db.prepare(query).all(...params, limit, offset);

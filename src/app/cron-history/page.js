@@ -74,7 +74,30 @@ export default function CronHistory() {
       ? selectedItem.data 
       : (selectedItem.data.monitorLogs || []);
 
-    if (rawLogs.length === 0) return null;
+    let targetUsers = [];
+    if (selectedItem.target_users_json) {
+      try {
+        targetUsers = typeof selectedItem.target_users_json === "string"
+          ? JSON.parse(selectedItem.target_users_json)
+          : selectedItem.target_users_json;
+      } catch (e) {
+        console.error("target_users_json 파싱 실패:", e);
+      }
+    }
+
+    if (rawLogs.length === 0 && targetUsers.length === 0) return null;
+
+    // Jira displayName과 DB name 간의 유연한 포함 관계 매핑 헬퍼 함수
+    const getNormalizedAuthorName = (authorRaw) => {
+      if (!authorRaw) return "Unknown";
+      const authorClean = authorRaw.trim();
+      const matchUser = targetUsers.find(u => 
+        authorClean === u.name ||
+        authorClean.startsWith(u.name) ||
+        u.name.startsWith(authorClean)
+      );
+      return matchUser ? matchUser.name : authorClean;
+    };
 
     const logs = rawLogs.map(log => {
       let pc = log.projectCode;
@@ -92,7 +115,8 @@ export default function CronHistory() {
           wt = wt || "기타";
         }
       }
-      return { ...log, projectCode: pc, workType: wt };
+      const normAuthor = getNormalizedAuthorName(log.author);
+      return { ...log, projectCode: pc, workType: wt, author: normAuthor };
     });
     
     const pCodeMap = {};
@@ -106,6 +130,11 @@ export default function CronHistory() {
       if (activeFilter.type === 'author') return log.author === activeFilter.value;
       return true;
     }) : logs;
+
+    // 분석 대상자 0H 기본 구축 (작업기록이 없어도 UI에 표시되도록 보장)
+    targetUsers.forEach(u => {
+      userMap[u.name] = { name: u.name, totalHours: 0 };
+    });
 
     logs.forEach(log => {
       const s = log.timeSpentSeconds || 0;

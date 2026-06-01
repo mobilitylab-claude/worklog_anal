@@ -142,7 +142,12 @@ export async function POST(request) {
     if (overrideJql && overrideJql.trim()) {
       appliedJql = overrideJql.trim();
       if (targetUsers && targetUsers.length > 0) {
-        validDtAccounts = [...new Set(targetUsers.map(u => u.dt_account).filter(Boolean))];
+        const rawAccounts = targetUsers.map(u => u.dt_account).filter(Boolean);
+        validDtAccounts = [...new Set([
+          ...rawAccounts,
+          ...rawAccounts.map(a => a.toLowerCase()),
+          ...rawAccounts.map(a => a.toUpperCase())
+        ])];
         validNames      = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
         isCustomTarget  = true;
         debugLog.push(`[JQL] 수동 입력 + 작성자 필터 적용 (${validDtAccounts.length}명)`);
@@ -150,7 +155,12 @@ export async function POST(request) {
         debugLog.push(`[JQL] 수동 입력, 작성자 필터 없음 → 전체 포함`);
       }
     } else if (targetType === "custom" && targetUsers && targetUsers.length > 0) {
-      validDtAccounts = [...new Set(targetUsers.map(u => u.dt_account).filter(Boolean))];
+      const rawAccounts = targetUsers.map(u => u.dt_account).filter(Boolean);
+      validDtAccounts = [...new Set([
+        ...rawAccounts,
+        ...rawAccounts.map(a => a.toLowerCase()),
+        ...rawAccounts.map(a => a.toUpperCase())
+      ])];
       validNames      = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
       isCustomTarget  = true;
       const inList    = validDtAccounts.map(id => `"${id}"`).join(", ");

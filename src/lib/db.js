@@ -211,4 +211,26 @@ db.exec(`
   )
 `);
 
+// 🚀 [마이그레이션] worklog_results 테이블에 target_users_json 컬럼이 없는 경우 추가
+try {
+  const tableInfo = db.prepare("PRAGMA table_info(worklog_results)").all();
+  const hasTargetUsersJson = tableInfo.some(c => c.name === 'target_users_json');
+  if (!hasTargetUsersJson) {
+    console.log("Adding target_users_json column to worklog_results table...");
+    try {
+      db.exec("ALTER TABLE worklog_results ADD COLUMN target_users_json TEXT");
+      console.log("Migration for worklog_results finished successfully.");
+    } catch (alterErr) {
+      if (alterErr.message.includes("duplicate column name")) {
+        console.log("Column target_users_json already exists.");
+      } else {
+        throw alterErr;
+      }
+    }
+  }
+} catch (err) {
+  console.error("Migration for worklog_results table failed:", err);
+}
+
 export default db;
+

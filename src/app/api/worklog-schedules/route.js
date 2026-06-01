@@ -48,3 +48,26 @@ export async function DELETE(request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(request) {
+  try {
+    const { id, target_mode, target_users } = await request.json();
+    if (!id) return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
+
+    const stmt = db.prepare(`
+      UPDATE worklog_schedules
+      SET target_mode = ?, target_users_json = ?
+      WHERE id = ?
+    `);
+    
+    stmt.run(
+      target_mode || "all",
+      JSON.stringify(target_users || []),
+      id
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

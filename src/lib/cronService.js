@@ -97,7 +97,12 @@ export async function runWorklogReports({ forceDate = null, forceType = null } =
     let targetUsersData = [];
     try { targetUsersData = JSON.parse(target_users_json || "[]"); } catch(e) {}
     
-    const accounts = [...new Set(targetUsersData.map(u => u.dt_account).filter(Boolean))];
+    const rawAccounts = targetUsersData.map(u => u.dt_account).filter(Boolean);
+    const accounts = [...new Set([
+      ...rawAccounts,
+      ...rawAccounts.map(a => a.toLowerCase()),
+      ...rawAccounts.map(a => a.toUpperCase())
+    ])];
     const endDateNextObj = new Date(rEndDate);
     endDateNextObj.setDate(endDateNextObj.getDate() + 1);
     const endDateNext = getKstDateString(endDateNextObj);
@@ -129,9 +134,9 @@ export async function runWorklogReports({ forceDate = null, forceType = null } =
       const totalHours = parseFloat((totalSeconds / 3600).toFixed(1));
 
       db.prepare(`
-        INSERT INTO worklog_results (schedule_id, report_type, target_date, total_hours, report_data_json)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(id, schedule_type, targetDateKey, totalHours, JSON.stringify(rawLogs));
+        INSERT INTO worklog_results (schedule_id, report_type, target_date, total_hours, report_data_json, target_users_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(id, schedule_type, targetDateKey, totalHours, JSON.stringify(rawLogs), target_users_json);
 
       logs.push(`[Success] Schedule ${id}: 저장 완료 (${totalHours}h, ${rawLogs.length}건)`);
       generatedCount++;

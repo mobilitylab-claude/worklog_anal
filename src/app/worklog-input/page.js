@@ -74,11 +74,18 @@ export default function WorklogInput() {
   const [recentIssues, setRecentIssues] = useState([]); // [{ key, summary, totalHours }]
   const [todayTotal, setTodayTotal] = useState(0);    // 오늘 전체 등록 공수(h)
   const [searching, setSearching] = useState(false);
+  const [jiraHost, setJiraHost] = useState("");
+  const [searchingDirect, setSearchingDirect] = useState(false);
 
   // ── 권장 시간 계산 (1.25배 Scale-up) ───────────────────────────
   const recommendedHours = useMemo(() => {
     const val = parseFloat(actualHours) || 0;
-    return isScaleUp ? (val * 1.25).toFixed(1) : val.toString();
+    if (isScaleUp) {
+      const scaled = val * 1.25;
+      const rounded = Math.round(scaled * 2) / 2; // 0.5h (30분) 단위 반올림
+      return rounded.toFixed(1);
+    }
+    return val.toString();
   }, [actualHours, isScaleUp]);
 
   // ── 최종 포맷 미리보기 ─────────────────────────────────────────
@@ -112,6 +119,7 @@ export default function WorklogInput() {
         const logs = data.worklogs;
 
         const jiraHost = data.jiraHost || "";
+        setJiraHost(jiraHost);
 
         // 1. 오늘 총 시간 계산
         const todayLogs = logs.filter(l => l.started.startsWith(todayStr));
@@ -166,6 +174,95 @@ export default function WorklogInput() {
   };
 
   useEffect(() => { loadRecentIssues(); }, []);
+
+  // ── Jira 이슈 직접 조회 ───────────────────────────────────────
+  const handleSearchIssue = async (key) => {
+    const trimmedKey = key.trim().toUpperCase();
+    if (!trimmedKey) {
+      alert("조회할 이슈 키를 입력해주세요.");
+      return;
+    }
+
+    setSearchingDirect(true);
+    try {
+      const res = await fetch("/api/jira", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getJiraAuthHeaders() },
+        body: JSON.stringify({
+          jql: `key = "${trimmedKey}"`,
+          fields: ["summary", "status", "issuetype", "project", "timetracking", "duedate", "created", "updated"]
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("이슈 조회 요청 실패");
+      }
+
+      const data = await res.json();
+      const issues = data.issues || [];
+
+      if (issues.length === 0) {
+        alert("해당 이슈 키를 찾을 수 없습니다. 철자를 확인해주세요.");
+        return;
+      }
+
+      const issue = issues[0];
+
+      // 완료 상태 체크 함수
+      const isDone = (status) => {
+        if (!status) return false;
+        const s = status.toLowerCase();
+        return s.includes("완료") || s.includes("done") || s.includes("resolved") || s.includes("closed") || s.includes("종료");
+      };
+
+      const issueData = {
+        key: issue.key,
+        summary: issue.fields.summary,
+        totalSeconds: 0,
+        issueStatus: issue.fields.status?.name,
+        issueType: issue.fields.issuetype?.name,
+        link: jiraHost ? `${jiraHost}/browse/${issue.key}` : "",
+        originalEstimate: issue.fields.timetracking?.originalEstimate || "-",
+        issueTimeSpent: issue.fields.timetracking?.timeSpent || "0h",
+        dueDate: issue.fields.duedate || "-",
+        createDate: issue.fields.created ? issue.fields.created.split("T")[0] : "-",
+        updateDate: issue.fields.updated ? issue.fields.updated.split("T")[0] : "-",
+        issueStartDate: issue.fields.created ? issue.fields.created.split("T")[0] : "-",
+      };
+
+      const processed = {
+        ...issueData,
+        isResolved: isDone(issueData.issueStatus),
+        isSubTask: issueData.issueType && (issueData.issueType.toLowerCase().includes("sub") || issueData.issueType.includes("하위")),
+        totalHours: "0.0",
+      };
+
+      // 최근 이슈 목록에 존재 여부 체크 및 리스트 업데이트
+      const existsIndex = recentIssues.findIndex((i) => i.key === processed.key);
+      if (existsIndex >= 0) {
+        const existing = recentIssues[existsIndex];
+        const updatedProcessed = {
+          ...processed,
+          totalSeconds: existing.totalSeconds || 0,
+          totalHours: existing.totalHours || "0.0",
+        };
+        const updatedList = [...recentIssues];
+        updatedList.splice(existsIndex, 1);
+        setRecentIssues([updatedProcessed, ...updatedList]);
+      } else {
+        setRecentIssues((prev) => [processed, ...prev]);
+      }
+
+      // 이슈 자동 선택 및 연동
+      handleIssueSelect(processed);
+      alert(`이슈 [${processed.key}] 조회 및 자동 선택 완료!`);
+    } catch (err) {
+      console.error("이슈 검색 에러:", err);
+      alert("이슈 조회 실패: " + err.message);
+    } finally {
+      setSearchingDirect(false);
+    }
+  };
 
   // ── 이슈 선택 핸들러 ───────────────────────────────────────────
   const handleIssueSelect = (issue) => {
@@ -265,6 +362,53 @@ export default function WorklogInput() {
                 </button>
               ))}
             </div>
+
+            {/* 이슈 직접 입력 */}
+            <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem" }}>
+              <input
+                type="text"
+                placeholder="이슈 키 직접 입력 (예: MOBIS-1234)"
+                value={issueKey}
+                onChange={(e) => setIssueKey(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearchIssue(issueKey);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: "0.6rem 1rem",
+                  borderRadius: "8px",
+                  border: "1px solid #333",
+                  background: "#111",
+                  color: "white",
+                  fontSize: "0.85rem",
+                  outline: "none",
+                  transition: "border-color 0.2s"
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleSearchIssue(issueKey)}
+                disabled={searchingDirect}
+                style={{
+                  padding: "0.6rem 1.2rem",
+                  borderRadius: "8px",
+                  background: "var(--accent-color)",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontWeight: "bold",
+                  transition: "opacity 0.2s",
+                  opacity: searchingDirect ? 0.6 : 1
+                }}
+              >
+                {searchingDirect ? "조회 중..." : "이슈 조회"}
+              </button>
+            </div>
+
             {issueKey && (() => {
               const selected = recentIssues.find(i => i.key === issueKey);
               return (

@@ -206,8 +206,50 @@ export default function WorklogAnalyzer() {
   const handleExport = async () => {
     if (worklogs.length === 0) return;
     try {
-      const xlsx = await import("xlsx");
+      const xlsx = await import("xlsx-js-style");
       const wb = xlsx.utils.book_new();
+
+      // ── 셀 주소 및 공통 스타일 정의 ─────────────────────────────────
+      const getCellAddress = (colIdx, rowIdx) => xlsx.utils.encode_cell({ c: colIdx, r: rowIdx });
+
+      const headerStyle = {
+        fill: { fgColor: { rgb: "365F91" } }, // 세련된 남색
+        font: { name: "맑은 고딕", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+
+      const subtotalStyle = {
+        fill: { fgColor: { rgb: "DCE6F1" } }, // 연한 파스텔 청색
+        font: { name: "맑은 고딕", sz: 11, bold: true, color: { rgb: "16365C" } },
+        alignment: { vertical: "center" }
+      };
+
+      const totalStyle = {
+        fill: { fgColor: { rgb: "B8CCE4" } }, // 조금 더 진한 청회색
+        font: { name: "맑은 고딕", sz: 11, bold: true, color: { rgb: "16365C" } },
+        alignment: { vertical: "center" }
+      };
+
+      // 시트 스타일 적용 헬퍼
+      const applySheetStyles = (sheet, headersCount, rowsCount, specialRows = {}) => {
+        // 1. 헤더행 스타일링 (0행)
+        for (let c = 0; c < headersCount; c++) {
+          const cellRef = getCellAddress(c, 0);
+          if (sheet[cellRef]) {
+            sheet[cellRef].s = headerStyle;
+          }
+        }
+        // 2. 소계 및 총계 스타일링
+        Object.entries(specialRows).forEach(([rStr, style]) => {
+          const r = parseInt(rStr, 10);
+          for (let c = 0; c < headersCount; c++) {
+            const cellRef = getCellAddress(c, r);
+            if (sheet[cellRef]) {
+              sheet[cellRef].s = style;
+            }
+          }
+        });
+      };
 
       // 시트1: 상세 내역
       const detail = filteredWorklogs.map(w => {
@@ -229,15 +271,22 @@ export default function WorklogAnalyzer() {
         return row;
       });
       const ws1 = xlsx.utils.json_to_sheet(detail);
+      if (detail.length > 0) {
+        applySheetStyles(ws1, Object.keys(detail[0]).length, detail.length);
+      }
       ws1["!cols"] = [{ wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 80 }];
       xlsx.utils.book_append_sheet(wb, ws1, "1. 작업 내역 상세");
 
       // 시트2: 월별
-      const ws2 = xlsx.utils.json_to_sheet(statsByMonth.map(s => ({
+      const monthlyData = statsByMonth.map(s => ({
         "연월": s.label,
         "MM": parseFloat(s.value),
         "총 시간(H)": parseFloat(s.hours)
-      })));
+      }));
+      const ws2 = xlsx.utils.json_to_sheet(monthlyData);
+      if (monthlyData.length > 0) {
+        applySheetStyles(ws2, 3, monthlyData.length);
+      }
       ws2["!cols"] = [{ wch: 15 }, { wch: 12 }, { wch: 15 }];
       xlsx.utils.book_append_sheet(wb, ws2, "2. 월별 통계");
 
@@ -338,7 +387,21 @@ export default function WorklogAnalyzer() {
       });
       finalRows.push(totalRow);
 
+      // 소계/총계 행 인덱스 매핑 구성 (1-indexed 기준)
+      const specialRows = {};
+      finalRows.forEach((row, idx) => {
+        const rIdx = idx + 1;
+        if (row["작업자"].startsWith("[소계]")) {
+          specialRows[rIdx] = subtotalStyle;
+        } else if (row["작업자"].startsWith("[총계]")) {
+          specialRows[rIdx] = totalStyle;
+        }
+      });
+
       const ws3 = xlsx.utils.json_to_sheet(finalRows);
+      if (finalRows.length > 0) {
+        applySheetStyles(ws3, 3 + allProjectCodes.length, finalRows.length, specialRows);
+      }
       const colWidths = [
         { wch: 25 }, // 작업자
         { wch: 18 }, // 분석대상 그룹
@@ -347,6 +410,101 @@ export default function WorklogAnalyzer() {
       ];
       ws3["!cols"] = colWidths;
       xlsx.utils.book_append_sheet(wb, ws3, "3. 작업자별 통계");
+
+      // ── 작업자별 개별 상세 시트 추가 ─────────────────────────────────
+      statsByUser.forEach(s => {
+        const authorName = s.label;
+
+        // DB에서 해당 작업자의 그룹(part) 조회
+        const dbUser = dbUsers.find(u =>
+          authorName === u.name ||
+          authorName.startsWith(u.name) ||
+          u.name.startsWith(authorName)
+        );
+        const groupName = dbUser ? (dbUser.part || "미지정") : "미지정";
+
+        // 협력사명을 제거한 순수 실명(이름) 추출
+        const displayName = dbUser ? dbUser.name : authorName.split(' ')[0];
+
+        // 요구사항에 따른 7개 컬럼 고정 배치
+        const userDetail = filteredWorklogs
+          .filter(w => {
+            return w.author === authorName ||
+              w.author.startsWith(authorName) ||
+              authorName.startsWith(w.author);
+          })
+          .map(w => {
+            const row = {};
+            row["이슈 키"] = w.issueKey;
+            row["이슈 요약"] = w.issueSummary || "";
+            row["소요 시간(h)"] = parseFloat(w.timeSpent) || 0;
+            row["기한"] = w.dueDate || "-";
+            row["작업자"] = w.author;
+            row["이슈 상태"] = w.issueStatus || "";
+            row["작업 내용"] = w.comment || "";
+            return row;
+          });
+
+        if (userDetail.length === 0) return;
+
+        // 소계 계산
+        const totalSpentHours = userDetail.reduce((sum, r) => sum + (r["소요 시간(h)"] || 0), 0);
+
+        const headers = ["이슈 키", "이슈 요약", "소요 시간(h)", "기한", "작업자", "이슈 상태", "작업 내용"];
+        const subTotalRow = {
+          "이슈 키": "[소계] 누적 시간",
+          "이슈 요약": "",
+          "소요 시간(h)": parseFloat(totalSpentHours.toFixed(1)),
+          "기한": "",
+          "작업자": "",
+          "이슈 상태": "",
+          "작업 내용": ""
+        };
+        userDetail.push(subTotalRow);
+
+        // 정렬 순서 고정을 위해 header 옵션 전달
+        const wsUser = xlsx.utils.json_to_sheet(userDetail, { header: headers });
+
+        const headersCount = headers.length;
+        const userSpecialRows = {
+          [userDetail.length]: subtotalStyle // 마지막 소계 행
+        };
+        applySheetStyles(wsUser, headersCount, userDetail.length, userSpecialRows);
+
+        // 이슈 키에 Jira 하이퍼링크 및 링크 스타일 연결
+        const rowCount = userDetail.length;
+        for (let r = 1; r < rowCount; r++) {
+          const cellRef = getCellAddress(0, r); // 0번째 열 = "이슈 키"
+          if (wsUser[cellRef] && wsUser[cellRef].v && wsUser[cellRef].v !== "-") {
+            const issueKey = wsUser[cellRef].v;
+            const host = jiraHost || "jira.company.com";
+            const cleanHost = host.startsWith("http") ? host : `https://${host}`;
+            const issueUrl = `${cleanHost}/browse/${issueKey}`;
+            
+            wsUser[cellRef].l = { Target: issueUrl, Tooltip: `${issueKey}로 이동` };
+            // 링크를 잘 구별할 수 있도록 파란색 + 밑줄 처리
+            wsUser[cellRef].s = {
+              font: { name: "맑은 고딕", sz: 11, color: { rgb: "0563C1" }, underline: true },
+              alignment: { vertical: "center" }
+            };
+          }
+        }
+
+        // 요구사항에 따른 너비 세팅
+        wsUser["!cols"] = [
+          { wch: 15 }, // 이슈 키
+          { wch: 40 }, // 이슈 요약
+          { wch: 15 }, // 소요 시간(h)
+          { wch: 12 }, // 기한
+          { wch: 15 }, // 작업자
+          { wch: 12 }, // 이슈 상태
+          { wch: 80 }  // 작업 내용
+        ];
+
+        // 시트이름 뒤는 "(대상그룹명)"으로 치환
+        const sheetName = `${displayName} (${groupName})`.substring(0, 31);
+        xlsx.utils.book_append_sheet(wb, wsUser, sheetName);
+      });
 
       xlsx.writeFile(wb, `Jira_Worklog_${startDate}_to_${endDate}.xlsx`);
     } catch (e) {

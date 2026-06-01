@@ -4,11 +4,11 @@ import { fetchJiraSearch } from "@/lib/jiraClient";
 // Controller Layer: 요청을 라우팅하고 응답 포맷을 맞춥니다.
 export async function POST(request) {
   try {
-    const { jql } = await request.json();
+    const { jql, fields } = await request.json();
     const xJiraToken = request.headers.get("x-jira-token");
     
     // Data Access Layer 호출 (실제 로직 분리)
-    const issues = await fetchJiraSearch(jql, undefined, { apiToken: xJiraToken });
+    const issues = await fetchJiraSearch(jql, fields, { apiToken: xJiraToken });
 
     return NextResponse.json({ issues });
   } catch (error) {
