@@ -28,6 +28,8 @@ export async function GET(request) {
       notiType: 'INVALID_TASK_TYPE',
       title: '미정의 작업유형 기록',
       message: '정의되지 않은 작업유형(디자인/기타)으로 공수가 기록되었습니다.',
+      comment: 'WEB-124 / 디자인 / 로그인 페이지 개발 완료',
+      parsedWorkType: '디자인',
       issueKey: 'WEB-124',
       url: 'https://jira.yourcompany.com/browse/WEB-124',
       author: '이영희',

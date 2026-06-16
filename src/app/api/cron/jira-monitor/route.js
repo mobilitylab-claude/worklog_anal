@@ -374,6 +374,8 @@ export async function GET() {
               notiType: 'INVALID_TASK_TYPE',
               title: '미정의 작업유형',
               message: `코멘트에 표준 작업유형(예: [개발])이 올바르게 명시되지 않았습니다.`,
+              comment: commentStr,
+              parsedWorkType: parsedWorkType || null,
               issueKey,
               url,
               author,

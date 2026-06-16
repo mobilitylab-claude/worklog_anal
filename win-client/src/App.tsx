@@ -4,7 +4,7 @@ import './App.css'
 function App() {
   const [logs, setLogs] = useState<any[]>(() => {
     try {
-      const saved = localStorage.getItem('noti_logs');
+      const saved = sessionStorage.getItem('noti_logs');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
@@ -80,8 +80,19 @@ function App() {
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const appWindow = getCurrentWindow();
-      await appWindow.show();
-      await appWindow.unminimize();
+      
+      const isVisible = await appWindow.isVisible();
+      const isMinimized = await appWindow.isMinimized();
+      
+      if (isMinimized) {
+        await appWindow.unminimize();
+      }
+      if (!isVisible) {
+        await appWindow.show();
+      }
+      
+      // 그래픽 컨텍스트 락/블랙스크린 방지를 위한 짧은 대기
+      await new Promise(resolve => setTimeout(resolve, 50));
       await appWindow.setFocus();
     } catch (e) {
       console.log('Tauri API not available:', e);
@@ -185,7 +196,7 @@ function App() {
       }
     }
 
-    eventSource.onerror = (err) => {
+    eventSource.onerror = () => {
       setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'error', msg: `[${new Date().toLocaleTimeString()}] ❌ SSE 연결 오류. 네트워크 문제일 경우 자동 재접속을 시도합니다...` }, ...prev])
       setIsConnected(false)
       // 네이티브 자동 재접속을 지원하기 위해 여기서는 close()를 호출하지 않습니다.
@@ -201,7 +212,7 @@ function App() {
     setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'info', msg: `[${new Date().toLocaleTimeString()}] 🔌 서버와의 연결을 수동으로 해제했습니다.` }, ...prev])
   }
 
-  // 앱 실행 시 자동 연결 시도
+  // 앱 실행 시 자동 연결 시도 및 클린업
   useEffect(() => {
     if ('Notification' in window && Notification.permission !== 'granted') {
       Notification.requestPermission()
@@ -211,12 +222,19 @@ function App() {
     if (!isConnected && !esRef.current) {
       connectSSE();
     }
+    
+    return () => {
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 로그가 변경될 때마다 localStorage에 저장
+  // 로그가 변경될 때마다 sessionStorage에 저장
   useEffect(() => {
-    localStorage.setItem('noti_logs', JSON.stringify(logs));
+    sessionStorage.setItem('noti_logs', JSON.stringify(logs));
   }, [logs]);
 
   // 페이지 로딩 후 경과 시간 타이머
@@ -242,19 +260,52 @@ function App() {
     // 2. 미등록 프로젝트 / 3. 미정의 작업유형 / 4. 예상시간 초과
     const isAlert = ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType);
     if (isAlert) {
-      let borderColor = '#f59e0b'; // 경고 (노란색)
-      if (log.notiType === 'INVALID_PROJECT') borderColor = '#ef4444'; // 위험 (빨간색)
-      
       const isRead = log.isRead;
-      const opacity = isRead ? 0.5 : 1;
-      const bg = isRead ? '#2a2a2a' : '#3f1d1d';
+      let borderColor = '#f59e0b'; // 경고 (노란색)
+      let bg = isRead ? '#2a2a2a' : '#3f1d1d';
+      
+      if (log.notiType === 'INVALID_PROJECT') {
+        borderColor = '#ef4444'; // 위험 (빨간색)
+      } else if (log.notiType === 'INVALID_TASK_TYPE') {
+        borderColor = '#f97316'; // 미정의 작업유형 (주황색)
+        if (!isRead) bg = '#431407'; // 미확인 시 주황/붉은색 어두운 배경
+      }
+      
       const bColor = isRead ? '#555' : borderColor;
+      const opacity = isRead ? 0.5 : 1;
 
       return (
         <div key={log.id || index} style={{ position: 'relative', opacity, background: bg, padding: '12px', borderRadius: '6px', marginBottom: '10px', borderLeft: `4px solid ${bColor}`, transition: 'all 0.3s' }}>
           <div style={{ fontSize: '0.8rem', color: isRead ? '#888' : '#fca5a5', marginBottom: '4px' }}>{log.receiveTime} - 🚨 {log.notiType}</div>
           <div style={{ fontWeight: 'bold', color: isRead ? '#aaa' : '#f87171' }}>{log.title}</div>
           <div style={{ color: isRead ? '#777' : '#fca5a5', fontSize: '0.9rem', margin: '4px 0' }}>{log.message}</div>
+          
+          {/* 미정의 작업유형 상세 가이드 표시 */}
+          {!isRead && log.notiType === 'INVALID_TASK_TYPE' && (
+            <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px', borderRadius: '6px', margin: '8px 0', borderLeft: '3px solid #f97316', fontSize: '0.8rem', lineHeight: '1.4' }}>
+              {log.parsedWorkType ? (
+                <div style={{ marginBottom: '4px', color: '#fca5a5' }}>
+                  ❌ 입력된 작업유형 <span style={{ color: '#ef4444', background: '#fee2e2', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>{log.parsedWorkType}</span>은(는) 정의되지 않은 유형입니다.
+                </div>
+              ) : (
+                <div style={{ marginBottom: '4px', color: '#f87171', fontWeight: 'bold' }}>
+                  ⚠️ 코멘트에 작업유형(예: [개발], [기획] 등)이 누락되었거나 형식 오류입니다.
+                </div>
+              )}
+              
+              {log.comment && (
+                <div style={{ color: '#94a3b8', fontStyle: 'italic', margin: '6px 0', background: 'rgba(0,0,0,0.15)', padding: '6px', borderRadius: '4px', border: '1px solid #475569', wordBreak: 'break-all' }}>
+                  &quot;{log.comment}&quot;
+                </div>
+              )}
+              
+              <div style={{ color: '#cbd5e1', marginTop: '6px', fontSize: '0.75rem' }}>
+                💡 <strong>올바른 입력 가이드:</strong> JIRA 코멘트 시작 부분에 아래 형식 중 하나를 명시해 주세요:
+                <div style={{ color: '#60a5fa', margin: '2px 0 0 10px' }}>1. [프로젝트코드] [작업유형] 작업상세내용</div>
+                <div style={{ color: '#60a5fa', margin: '2px 0 0 10px' }}>2. 프로젝트코드 / 작업유형 / 작업상세내용</div>
+              </div>
+            </div>
+          )}
           
           <div style={{ fontSize: '0.8rem', color: isRead ? '#666' : '#cbd5e1', marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             {log.issueKey && <span>🔑 {log.issueKey}</span>}
