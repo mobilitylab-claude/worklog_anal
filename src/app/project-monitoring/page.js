@@ -277,10 +277,109 @@ export default function ProjectMonitoring() {
     try {
       const xlsx = await import("xlsx");
       const wb = xlsx.utils.book_new();
-      const detail = filteredWorklogs.map(w => ({ "날짜": new Date(w.started).toLocaleDateString(), "이슈": w.issueKey, "요약": w.issueSummary, "작업자": w.author, "시간(h)": w.timeSpent, "MM": calculateMM(w.timeSpentSeconds/3600), "유형": w.taskType, "내용": w.comment }));
+
+      // 1. 작업상세 시트 데이터 생성 (시간과 MM을 숫자 타입으로 저장)
+      const detail = filteredWorklogs.map(w => {
+        const seconds = w.timeSpentSeconds || 0;
+        const hours = Number((seconds / 3600).toFixed(2));
+        const mm = Number((seconds / 3600 / 8 / 20.5).toFixed(4));
+        return {
+          "날짜": w.started ? new Date(w.started).toLocaleDateString() : "",
+          "이슈": w.issueKey || "",
+          "이슈 유형": w.issueType || "",
+          "이슈 요약": w.issueSummary || "",
+          "작업자": w.author || "",
+          "시간(h)": hours,
+          "MM": mm,
+          "작업 유형": w.taskType || "",
+          "내용": w.comment || ""
+        };
+      });
+
+      // 2. 작업자별 통계 데이터 생성
+      const userMap = {};
+      filteredWorklogs.forEach(w => {
+        const user = w.author || "미지정";
+        userMap[user] = (userMap[user] || 0) + (w.timeSpentSeconds || 0);
+      });
+      const userStats = Object.entries(userMap)
+        .sort((a, b) => b[1] - a[1])
+        .map(([author, seconds]) => {
+          const hours = Number((seconds / 3600).toFixed(2));
+          const mm = Number((seconds / 3600 / 8 / 20.5).toFixed(4));
+          return {
+            "작업자": author,
+            "총 시간(h)": hours,
+            "MM": mm
+          };
+        });
+
+      // 3. 작업별 유형 통계 데이터 생성
+      const taskTypeMap = {};
+      filteredWorklogs.forEach(w => {
+        const tType = w.taskType || "미분류";
+        taskTypeMap[tType] = (taskTypeMap[tType] || 0) + (w.timeSpentSeconds || 0);
+      });
+      const taskTypeStats = Object.entries(taskTypeMap)
+        .sort((a, b) => b[1] - a[1])
+        .map(([tType, seconds]) => {
+          const hours = Number((seconds / 3600).toFixed(2));
+          const mm = Number((seconds / 3600 / 8 / 20.5).toFixed(4));
+          return {
+            "작업 유형": tType,
+            "총 시간(h)": hours,
+            "MM": mm
+          };
+        });
+
+      // 4. 월별 추이 통계 데이터 생성
+      const monthMap = {};
+      filteredWorklogs.forEach(w => {
+        const month = (w.started || "").substring(0, 7);
+        if (month) {
+          monthMap[month] = (monthMap[month] || 0) + (w.timeSpentSeconds || 0);
+        }
+      });
+      const monthStats = Object.entries(monthMap)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([month, seconds]) => {
+          const hours = Number((seconds / 3600).toFixed(2));
+          const mm = Number((seconds / 3600 / 8 / 20.5).toFixed(4));
+          return {
+            "년월": month,
+            "총 시간(h)": hours,
+            "MM": mm
+          };
+        });
+
+      // 5. 이슈 유형별 통계 데이터 생성
+      const issueTypeMap = {};
+      filteredWorklogs.forEach(w => {
+        const iType = w.issueType || "미분류";
+        issueTypeMap[iType] = (issueTypeMap[iType] || 0) + (w.timeSpentSeconds || 0);
+      });
+      const issueTypeStats = Object.entries(issueTypeMap)
+        .sort((a, b) => b[1] - a[1])
+        .map(([iType, seconds]) => {
+          const hours = Number((seconds / 3600).toFixed(2));
+          const mm = Number((seconds / 3600 / 8 / 20.5).toFixed(4));
+          return {
+            "이슈 유형": iType,
+            "총 시간(h)": hours,
+            "MM": mm
+          };
+        });
+
       xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(detail), "작업상세");
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(userStats), "작업자별 통계");
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(taskTypeStats), "작업유형별 통계");
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(monthStats), "월별 추이");
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(issueTypeStats), "이슈유형별 통계");
+
       xlsx.writeFile(wb, `Project_Monitoring_${projectCode || "Export"}.xlsx`);
-    } catch (e) { alert("엑셀 저장 실패: " + e.message); }
+    } catch (e) {
+      alert("엑셀 저장 실패: " + e.message);
+    }
   };
 
   return (
