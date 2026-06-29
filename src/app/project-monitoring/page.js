@@ -109,26 +109,20 @@ export default function ProjectMonitoring() {
       endDateObj.setDate(endDateObj.getDate() + 1);
       const endDateNext = endDateObj.toISOString().split("T")[0];
 
-      let dateJql = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}"`;
+      let dateJql = `updated >= "${startDate}"`;
       let orFilters = [];
       if (parentKey) orFilters.push(`parent = "${parentKey}"`);
-      
+
       let targetUsersData = [];
       if (targetMode !== "all" && selectedUsers.length > 0) {
         targetUsersData = dbUsers.filter(u => selectedUsers.includes(u.id));
       } else {
-        // 전체 모드라도 투입된 인력(dbUsers)에 대해서만 필터링하도록 강제 설정
         targetUsersData = [...dbUsers];
-      }
-
-      const accounts = [...new Set(targetUsersData.map(u => u.dt_account).filter(Boolean))];
-      if (accounts.length > 0) {
-        orFilters.push(`worklogAuthor in (${accounts.map(a => `"${a}"`).join(", ")})`);
       }
 
       let finalJql = dateJql;
       if (orFilters.length > 0) {
-        finalJql += ` AND (${orFilters.join(" OR ")})`;
+        finalJql += ` AND (${orFilters.join(" AND ")})`;
       }
 
       const res = await fetch("/api/worklogs", {

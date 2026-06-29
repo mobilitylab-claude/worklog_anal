@@ -3,11 +3,14 @@ import db from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const xJiraToken = request?.headers?.get('x-jira-token');
+    const JIRA_API_TOKEN = xJiraToken || process.env.JIRA_API_TOKEN;
+
     const row = db.prepare('SELECT value FROM dashboard_config WHERE key = ?').get('noti_target_USER_WORKLOG');
     const targetStr = row ? row.value : '';
-    
+
     // 대상자가 명시적으로 없으면 빈 객체 반환 (전체 사용자를 미리 로드하기엔 부담됨)
     if (!targetStr) {
       return Response.json({ success: true, stats: {} });
@@ -16,7 +19,7 @@ export async function GET() {
     const rawTargets = targetStr.split(',').map(s => s.trim()).filter(s => s);
     const targets = [];
     const seenNames = new Set();
-    
+
     for (const raw of rawTargets) {
       // 공백 이전의 순수 이름만 추출 (예: "탄보련 기타모비스온사용자" -> "탄보련")
       const name = raw.split(' ')[0];
@@ -33,15 +36,15 @@ export async function GET() {
     // 기본적으로 모두 0으로 초기화
     const stats = {};
     const details = {};
-    targets.forEach(t => { 
-      stats[t] = 0; 
+    targets.forEach(t => {
+      stats[t] = 0;
       details[t] = [];
     });
 
     // 한글 이름 -> DT 계정 매핑 조회 (JQL 최적화용)
     const dtAccounts = [];
     const dtToName = {};
-    
+
     for (const name of targets) {
       const userRow = db.prepare('SELECT dt_account FROM users WHERE name = ?').get(name);
       if (userRow && userRow.dt_account) {
@@ -65,48 +68,58 @@ export async function GET() {
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    // 사용자가 제안한 대로 worklogAuthor in () 을 활용하여 쿼리 최적화 (DT 계정 기반)
-    const jql = `worklogDate >= "${todayStr}" AND worklogDate < "${tomorrowStr}" AND worklogAuthor in (${dtAccounts.map(id => `"${id}"`).join(', ')})`;
+    // JQL을 이용해 대상자들의 오늘자 워크로그 정밀 검색
+    const projectClause = process.env.JIRA_PROJECT || "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
+    const authorCond = dtAccounts.length > 0 ? ` AND worklogAuthor in (${dtAccounts.map(a => `${a}`).join(', ')})` : "";
+    const jql = `${projectClause}${authorCond} AND worklogDate >= ${todayStr}`;
     const step2 = `[2/4] JQL 실행: ${jql}`;
     loadingLogs.push(step2);
     console.log(`[Initial Stats] ${step2}`);
-    
-    const issues = await fetchJiraSearch(jql, ['summary']);
+
+    const issues = await fetchJiraSearch(jql, ['summary', 'worklog'], { apiToken: JIRA_API_TOKEN });
     const step3 = `[3/4] 이슈 검색 완료: ${issues.length}개의 이슈 발견`;
     loadingLogs.push(step3);
     console.log(`[Initial Stats] ${step3}`);
+    if (issues.length > 0) {
+      console.log(`[Initial Stats Debug] Sample issue: key=${issues[0].key}, hasWorklog=${!!issues[0].fields?.worklog}, embLogsLen=${issues[0].fields?.worklog?.worklogs?.length}`);
+    }
 
     const JIRA_DOMAIN = (process.env.JIRA_DOMAIN || process.env.JIRA_HOST || "").replace(/\/$/, "");
-    const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
     const authHeader = `Bearer ${JIRA_API_TOKEN}`;
 
     const results = [];
-    const chunkSize = 5;
+    const chunkSize = 15;
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     for (let i = 0; i < issues.length; i += chunkSize) {
       const chunk = issues.slice(i, i + chunkSize);
       console.log(`[Initial Stats] Processing chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(issues.length / chunkSize)}...`);
-      
+
       const chunkResults = await Promise.all(chunk.map(async (iss) => {
         const issueKey = iss.key;
+        const embWl = iss.fields?.worklog;
+        if (embWl && Array.isArray(embWl.worklogs) && embWl.worklogs.length > 0 && (typeof embWl.total === 'undefined' || embWl.total <= embWl.worklogs.length)) {
+          console.log(`[Initial Stats Debug] Using embedded worklogs for ${issueKey} (count=${embWl.worklogs.length})`);
+          return { issueKey, wls: embWl.worklogs, summary: iss.fields?.summary || '' };
+        }
+
         let wls = [];
         let startAt = 0;
         let total = 1;
-        
+
         try {
           while (wls.length < total) {
             const url = `${JIRA_DOMAIN}/rest/api/2/issue/${issueKey}/worklog?startAt=${startAt}&maxResults=1000`;
             let res;
             let retries = 0;
             const maxRetries = 5;
-            
+
             while (retries < maxRetries) {
               res = await fetch(url, {
                 method: "GET",
                 headers: { "Authorization": authHeader }
               });
-              
+
               if (res.status === 429) {
                 console.log(`[Initial Stats] 429 hit for ${issueKey}. Waiting 3s (retry ${retries + 1}/${maxRetries})...`);
                 await sleep(3000);
@@ -115,7 +128,7 @@ export async function GET() {
                 break;
               }
             }
-            
+
             if (res.ok) {
               const data = await res.json();
               const logs = data.worklogs || [];
@@ -136,9 +149,9 @@ export async function GET() {
           return { issueKey, wls: [], summary: iss.fields?.summary || '' };
         }
       }));
-      
+
       results.push(...chunkResults);
-      
+
       // 429 방지를 위해 청크 사이에 200ms 대기
       if (i + chunkSize < issues.length) {
         await sleep(200);
@@ -152,22 +165,22 @@ export async function GET() {
     for (const result of results) {
       const { issueKey, wls, summary } = result;
       totalWorklogsFetched += wls.length;
-      
+
       for (const w of wls) {
         const wlAuthorId = w.author?.name || "";
         const wlAuthorName = w.author?.displayName || "";
-        
+
         // DT 계정으로 먼저 매핑 시도, 없으면 표시이름으로 시도
         const matchedTarget = dtToName[wlAuthorId] || targets.find(t => wlAuthorName.toLowerCase().includes(t.toLowerCase()));
-        
+
         if (matchedTarget) {
           totalWorklogsMatchedUser++;
-          
+
           // 한국 시간 기준으로 날짜 비교
           if (w.started) {
             const wlDate = new Date(w.started);
             const wlKstDateStr = new Date(wlDate.getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
-            
+
             if (wlKstDateStr === todayStr) {
               totalWorklogsMatchedDate++;
               const hours = (w.timeSpentSeconds || 0) / 3600;
@@ -216,7 +229,7 @@ export async function GET() {
     return Response.json({ success: true, stats: formattedStats, details, loadingLogs }, { headers });
   } catch (e) {
     console.error("Initial stats error:", e);
-    return Response.json({ success: false, error: e.message }, { 
+    return Response.json({ success: false, error: e.message }, {
       status: 500,
       headers: { 'Access-Control-Allow-Origin': '*' }
     });

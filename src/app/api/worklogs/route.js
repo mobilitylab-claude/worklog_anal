@@ -93,8 +93,16 @@ export async function POST(request) {
       startDate, endDate,
       includeKeyword, excludeKeyword,
       targetType, targetUsers,
-      overrideJql,
+      overrideJql, project
     } = await request.json();
+
+    let projectClause = "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
+    if (project && project.trim()) {
+      const p = project.trim();
+      projectClause = (p.includes(' ') || p.includes(',')) ? `project in (${p})` : `project = "${p}"`;
+    } else if (process.env.JIRA_PROJECT) {
+      projectClause = process.env.JIRA_PROJECT;
+    }
 
     const xJiraToken = request.headers.get("x-jira-token");
     const JIRA_DOMAIN    = process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
@@ -106,7 +114,6 @@ export async function POST(request) {
     }
 
     const cleanDomain = JIRA_DOMAIN.replace(/\/$/, "");
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
     const headers = {
       "Authorization": `Bearer ${JIRA_API_TOKEN}`,
@@ -115,13 +122,10 @@ export async function POST(request) {
     };
 
     // ── 1. JQL 결정 + 필터 대상 계정 추출 ────────────────────────
-    // ★ worklogDate <= endDate 는 00:00 경계 문제로 당일 누락 가능
-    //   → worklogDate < (endDate+1) 방식으로 당일 포함 보장
     const endDateObj  = new Date(endDate);
     endDateObj.setDate(endDateObj.getDate() + 1);
     const endDateNext = endDateObj.toISOString().split("T")[0];
 
-    let appliedJql      = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}" AND worklogAuthor = currentUser()`;
     let validDtAccounts = [];
     let validNames      = [];
     let isCustomTarget  = false;
@@ -139,8 +143,15 @@ export async function POST(request) {
       } else debugLog.push(`[currentUser] /myself HTTP ${mr.status}`);
     } catch(e) { debugLog.push(`[currentUser] err: ${e.message}`); }
 
+    let appliedJql = "";
+
     if (overrideJql && overrideJql.trim()) {
-      appliedJql = overrideJql.trim();
+      let cleaned = overrideJql.trim();
+      if (!cleaned.toLowerCase().includes('project')) {
+        appliedJql = `${projectClause} AND (${cleaned})`;
+      } else {
+        appliedJql = cleaned;
+      }
       if (targetUsers && targetUsers.length > 0) {
         const rawAccounts = targetUsers.map(u => u.dt_account).filter(Boolean);
         validDtAccounts = [...new Set([
@@ -163,11 +174,16 @@ export async function POST(request) {
       ])];
       validNames      = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
       isCustomTarget  = true;
-      const inList    = validDtAccounts.map(id => `"${id}"`).join(", ");
-      appliedJql      = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}" AND worklogAuthor in (${inList})`;
+      const authorList = validDtAccounts.length > 0 ? validDtAccounts.map(a => `${a}`).join(", ") : "";
+      const authorCond = authorList ? ` AND worklogAuthor in (${authorList})` : "";
+      const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
+      appliedJql      = `${projectClause}${authorCond} AND ${dateCond}`;
       debugLog.push(`[JQL] 자동 생성 — 대상 username: [${validDtAccounts.join(", ")}]`);
     } else {
-      debugLog.push(`[JQL] 자동 생성 — 나의 워크로그`);
+      const myAuth = myselfName || myselfAccountId || "currentUser()";
+      const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
+      appliedJql = `${projectClause} AND worklogAuthor in (${myAuth}) AND ${dateCond}`;
+      debugLog.push(`[JQL] 자동 생성 — 나의 워크로그 (${myAuth})`);
     }
 
     debugLog.push(`[실행 JQL] ${appliedJql}`);
@@ -175,8 +191,13 @@ export async function POST(request) {
 
     // ── 2. 이슈 전체 페이지네이션 수집 (공용 클라이언트 사용) ───────────
     debugLog.push("[이슈 수집] 시작 (전체 수집 모드)");
-    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "updated", "assignee"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
+    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "updated", "assignee", "worklog"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
     debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈 로드 완료`);
+    console.log(`[Worklog API] JQL="${appliedJql}" -> 검색된 이슈 수: ${allIssues.length}`);
+    if (allIssues.length > 0) {
+      const sample = allIssues[0];
+      console.log(`[Worklog API] Sample issue: key=${sample.key}, hasWorklogField=${!!sample.fields?.worklog}, embLogsLen=${sample.fields?.worklog?.worklogs?.length}, embTotal=${sample.fields?.worklog?.total}`);
+    }
 
     // ── 3. 이슈별 워크로그 순차 수집 + 2차 필터 ─────────────────
     const allWorklogs    = [];
@@ -190,12 +211,18 @@ export async function POST(request) {
     debugLog.push(`[2차 날짜 필터] ${applyDateFilter ? `적용 (${startDate}~${endDate})` : "미적용 — 수동 JQL 신뢰"}`);
 
     const chunkArray = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
-    const issueChunks = chunkArray(allIssues, 10);
+    const issueChunks = chunkArray(allIssues, 15);
     
     for (const chunk of issueChunks) {
       const chunkResults = await Promise.all(chunk.map(async (issue) => {
         try {
-          const logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
+          const embWl = issue.fields?.worklog;
+          let logs = [];
+          if (embWl && Array.isArray(embWl.worklogs) && embWl.worklogs.length > 0 && (typeof embWl.total === 'undefined' || embWl.total <= embWl.worklogs.length)) {
+            logs = embWl.worklogs;
+          } else {
+            logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
+          }
           return { issue, logs };
         } catch (e) {
           debugLog.push(`[Error] ${issue.key} 워크로그 수집 실패: ${e.message}`);
@@ -207,6 +234,9 @@ export async function POST(request) {
 
       for (const { issue, logs } of chunkResults) {
         let keptInIssue = 0;
+        if (logs.length > 0) {
+          console.log(`[Worklog API] Issue ${issue.key}: raw logs fetched count = ${logs.length}`);
+        }
 
         for (const w of logs) {
         statTotal++;
@@ -216,7 +246,11 @@ export async function POST(request) {
         // ── 날짜 2차 필터 ──
         if (applyDateFilter) {
           const sd = (w.started || "").split("T")[0];
-          if (!sd || sd < startDate || sd > endDate) { statDropDate++; continue; }
+          if (!sd || sd < startDate || sd > endDate) { 
+            statDropDate++; 
+            console.log(`[Worklog API Drop Date] Issue=${issue.key}, LogID=${w.id}, started=${w.started} (${sd}) vs range (${startDate}~${endDate})`);
+            continue; 
+          }
         }
 
         // ── 작성자 2차 필터 ──
@@ -236,6 +270,7 @@ export async function POST(request) {
           });
           if (!mAcc && !mDn) {
             statDropAuthor++;
+            console.log(`[Worklog API Drop CustomAuthor] Issue=${issue.key}, LogID=${w.id}, author.name=${wu}, author.displayName=${wd}`);
             const key = `${wd}(${w.author?.name || "?"})`;
             if (!excludedAuthors.has(key) && excludedAuthors.size < 30) excludedAuthors.add(key);
             continue;
@@ -253,6 +288,7 @@ export async function POST(request) {
             
             if (!matchName && !matchAcc && !matchDisp) {
               statDropAuthor++;
+              console.log(`[Worklog API Drop MeAuthor] Issue=${issue.key}, LogID=${w.id}, author=${wu}/${wd} vs myself=${myselfName}/${myselfDisplayName}`);
               debugLog.push(`[작성자 필터 제외] 나: name="${myselfName}", acc="${myselfAccountId}", disp="${myselfDisplayName}" <-> 워크로그: name="${w.author?.name}", acc="${w.author?.accountId}", disp="${wd}"`);
               continue;
             }

@@ -107,10 +107,9 @@ export async function runWorklogReports({ forceDate = null, forceType = null } =
     endDateNextObj.setDate(endDateNextObj.getDate() + 1);
     const endDateNext = getKstDateString(endDateNextObj);
     
-    let finalJql = `worklogDate >= "${rStartDate}" AND worklogDate < "${endDateNext}"`;
-    if (accounts.length > 0) {
-      finalJql += ` AND (worklogAuthor in (${accounts.map(a => `"${a}"`).join(", ")}))`;
-    }
+    const projectClause = process.env.JIRA_PROJECT || "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
+    const authorCondCron = accounts.length > 0 ? ` AND worklogAuthor in (${accounts.map(a => `${a}`).join(', ')})` : "";
+    let finalJql = `${projectClause}${authorCondCron} AND worklogDate >= ${rStartDate}`;
 
     try {
       const debugLog = [];

@@ -19,7 +19,6 @@ export async function GET() {
     return NextResponse.json(debugInfo);
   }
 
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   const cleanDomain = JIRA_DOMAIN.replace(/\/$/, "");
   
   // 회사 토큰(PAT)일 경우 Bearer, 혹시 몰라 Basic도 검사할 수 있지만 일단 Bearer 시도

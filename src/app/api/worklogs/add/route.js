@@ -40,7 +40,6 @@ export async function POST(request) {
     }
 
     const cleanDomain = JIRA_DOMAIN.replace(/\/$/, "");
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
     const headers = {
       "Authorization": `Bearer ${JIRA_API_TOKEN}`,

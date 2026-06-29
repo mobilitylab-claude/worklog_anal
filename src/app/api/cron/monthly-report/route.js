@@ -90,21 +90,13 @@ export async function GET(request) {
       endDateNextObj.setDate(endDateNextObj.getDate() + 1);
       const endDateNext = formatDate(endDateNextObj);
       
-      let dateJql = `worklogDate >= "${rStartDate}" AND worklogDate < "${endDateNext}"`;
+      let dateJql = `updated >= "${rStartDate}"`;
       let orFilters = [];
       if (schedule.parent_key) orFilters.push(`parent = "${schedule.parent_key}"`);
-      
-      let targetUsersData = [];
-      try { targetUsersData = JSON.parse(schedule.target_users_json || "[]"); } catch(e) {}
-      
-      const accounts = [...new Set(targetUsersData.map(u => u.dt_account).filter(Boolean))];
-      if (accounts.length > 0) {
-        orFilters.push(`worklogAuthor in (${accounts.map(a => `"${a}"`).join(", ")})`);
-      }
 
       let finalJql = dateJql;
       if (orFilters.length > 0) {
-        finalJql += ` AND (${orFilters.join(" OR ")})`;
+        finalJql += ` AND (${orFilters.join(" AND ")})`;
       }
 
       // /api/worklogs 호출 (동일 서버 내)

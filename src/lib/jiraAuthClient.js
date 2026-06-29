@@ -8,6 +8,6 @@ export function getJiraAuthHeaders() {
     if (active && active.token) {
       return { "x-jira-token": active.token };
     }
-  } catch (e) {}
+  } catch (e) { }
   return {};
 }

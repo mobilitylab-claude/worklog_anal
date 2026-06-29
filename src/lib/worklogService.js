@@ -81,20 +81,31 @@ export async function getWorklogs({
     "Content-Type": "application/json",
   };
 
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
   // ── 1. JQL 결정 및 사용자 정보 조회 ────────────────────────
   const endDateObj = new Date(endDate);
   endDateObj.setDate(endDateObj.getDate() + 1);
   const endDateNext = endDateObj.toISOString().split("T")[0];
 
-  let appliedJql = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}"`;
+  let projectClause = "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
+  if (project && project.trim()) {
+    const p = project.trim();
+    projectClause = (p.includes(' ') || p.includes(',')) ? `project in (${p})` : `project = "${p}"`;
+  } else if (process.env.JIRA_PROJECT) {
+    projectClause = process.env.JIRA_PROJECT;
+  }
+
+  let appliedJql = "";
   let validDtAccounts = [];
   let validNames = [];
   let isCustomTarget = false;
 
   if (overrideJql && overrideJql.trim()) {
-    appliedJql = overrideJql.trim();
+    let cleaned = overrideJql.trim();
+    if (!cleaned.toLowerCase().includes('project')) {
+      appliedJql = `${projectClause} AND (${cleaned})`;
+    } else {
+      appliedJql = cleaned;
+    }
     if (targetUsers.length > 0) {
       validDtAccounts = [...new Set(targetUsers.map(u => u.dt_account).filter(Boolean))];
       validNames = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
@@ -104,16 +115,26 @@ export async function getWorklogs({
     validDtAccounts = [...new Set(targetUsers.map(u => u.dt_account).filter(Boolean))];
     validNames = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
     isCustomTarget = true;
-    const inList = validDtAccounts.map(id => `"${id}"`).join(", ");
-    appliedJql += ` AND worklogAuthor in (${inList})`;
+    const authorList = validDtAccounts.length > 0 ? validDtAccounts.map(a => `${a}`).join(", ") : "";
+    const authorCond = authorList ? ` AND worklogAuthor in (${authorList})` : "";
+    const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
+    appliedJql = `${projectClause}${authorCond} AND ${dateCond}`;
   } else if (targetType === "me") {
-    appliedJql += ` AND worklogAuthor = currentUser()`;
+    const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
+    appliedJql = `${projectClause} AND worklogAuthor in (currentUser()) AND ${dateCond}`;
+  } else {
+    const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
+    appliedJql = `${projectClause} AND ${dateCond}`;
   }
 
   debugLog.push(`[Service] JQL: ${appliedJql}`);
 
-  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
+  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "worklog"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
   debugLog.push(`[Service] 이슈 수집 완료: ${allIssues.length}건`);
+  console.log(`[worklogService] JQL="${appliedJql}" -> 검색된 이슈 수: ${allIssues.length}`);
+  if (allIssues.length > 0) {
+    console.log(`[worklogService] Sample issue: key=${allIssues[0].key}, hasWorklog=${!!allIssues[0].fields?.worklog}, logsLen=${allIssues[0].fields?.worklog?.worklogs?.length}`);
+  }
   
   const allWorklogs = [];
   const seenWorklogIds = new Set();
@@ -124,8 +145,18 @@ export async function getWorklogs({
   let statAuthorFiltered = 0;
 
   for (const issue of allIssues) {
-    const logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
+    const embWl = issue.fields?.worklog;
+    let logs = [];
+    if (embWl && Array.isArray(embWl.worklogs) && embWl.worklogs.length > 0 && (typeof embWl.total === 'undefined' || embWl.total <= embWl.worklogs.length)) {
+      logs = embWl.worklogs;
+    } else {
+      logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
+    }
     
+    if (logs.length > 0) {
+      console.log(`[worklogService] Issue ${issue.key}: raw logs count = ${logs.length}`);
+    }
+
     for (const w of logs) {
       statTotal++;
       if (seenWorklogIds.has(w.id)) continue;
@@ -136,6 +167,7 @@ export async function getWorklogs({
         const sd = (w.started || "").split("T")[0];
         if (!sd || sd < startDate || sd > endDate) {
           statDateFiltered++;
+          console.log(`[worklogService Drop Date] Issue=${issue.key}, LogID=${w.id}, started=${w.started} (${sd}) vs range (${startDate}~${endDate})`);
           continue;
         }
       }

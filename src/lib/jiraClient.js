@@ -33,7 +33,6 @@ export async function fetchJiraSearch(jql, fields = ["summary", "status", "assig
     throw new Error("환경변수(JIRA_HOST 패턴)가 설정되지 않았습니다.");
   }
 
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   const authHeader = `Bearer ${JIRA_API_TOKEN}`;
   const url = `${JIRA_DOMAIN}/rest/api/2/search`;
 

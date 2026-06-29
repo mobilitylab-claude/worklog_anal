@@ -140,8 +140,7 @@ export default function ProjectGantt() {
       // Jira JQL에서 worklogComment ~ "..." 가 일부 버전에서 에러를 유발할 수 있습니다.
       // 텍스트 전체 검색(text ~)으로 프로젝트 코드가 포함된 이슈를 빠르게 찾도록 변경합니다.
       const projCodes = proj.code.split(",").map(c => c.trim()).filter(Boolean);
-      const textJql = projCodes.map(c => `text ~ "${c}"`).join(" OR ");
-      const jql = `worklogDate >= "${start}" AND worklogDate <= "${queryEnd}" AND (${textJql})`;
+      const jql = `updated >= "${start}" AND (${textJql})`;
 
       // 1시간 세션 캐시 확인 (Jira API 호출 최소화)
       const cacheKey = `gantt_cache_v2_${proj.code}`;

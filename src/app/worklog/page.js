@@ -75,25 +75,13 @@ export default function WorklogAnalyzer() {
   }, []);
 
   // ── 자동 JQL 생성 (미리보기 표시용) ─────────────────────────
-  // ※ 실제 실행 JQL도 백엔드에서 동일하게 worklogDate < endDate+1일 방식 사용
   useEffect(() => {
     if (isManualJql) return;
-
     const endDateObj = new Date(endDate);
     endDateObj.setDate(endDateObj.getDate() + 1);
     const endDateNext = endDateObj.toISOString().split("T")[0];
-
-    let jql = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}" AND worklogAuthor = currentUser()`;
-
-    if (targetMode !== "me" && selectedUsers.length > 0) {
-      const accounts = [...new Set(
-        dbUsers.filter(u => selectedUsers.includes(u.id)).map(u => u.dt_account).filter(Boolean)
-      )];
-      if (accounts.length > 0) {
-        const list = accounts.map(a => `"${a}"`).join(", ");
-        jql = `worklogDate >= "${startDate}" AND worklogDate < "${endDateNext}" AND worklogAuthor in (${list})`;
-      }
-    }
+    const dateCond = (startDate && endDate && startDate !== endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
+    let jql = `project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (currentUser()) AND ${dateCond}`;
     setJqlValue(jql);
   }, [startDate, endDate, targetMode, selectedUsers, dbUsers, isManualJql]);
 

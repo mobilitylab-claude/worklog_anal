@@ -143,8 +143,10 @@ export async function GET() {
         const tomorrow = new Date(todayObj.getTime() + 24 * 60 * 60 * 1000);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-        // 사용자가 제안한 대로 worklogAuthor in () 을 활용하여 쿼리 최적화 (DT 계정 기반)
-        const jqlAll = `worklogDate >= "${todayStr}" AND worklogDate < "${tomorrowStr}" AND worklogAuthor in (${dtAccounts.map(id => `"${id}"`).join(', ')})`;
+        // 특정 프로젝트 및 대상 사용자 계정 기반 워크로그 정밀 JQL
+        const projectClause = process.env.JIRA_PROJECT || "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
+        const authorCondMon = dtAccounts.length > 0 ? ` AND worklogAuthor in (${dtAccounts.map(a => `${a}`).join(', ')})` : "";
+        const jqlAll = `${projectClause}${authorCondMon} AND worklogDate >= ${todayStr}`;
         const issuesAll = await fetchJiraSearch(jqlAll, ['summary']);
         
         const JIRA_DOMAIN_MON = (process.env.JIRA_DOMAIN || process.env.JIRA_HOST || "").replace(/\/$/, "");

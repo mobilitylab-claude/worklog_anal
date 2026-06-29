@@ -73,6 +73,7 @@ export default function WorklogInput() {
   const [searchKey, setSearchKey] = useState("");
   const [recentIssues, setRecentIssues] = useState([]); // [{ key, summary, totalHours }]
   const [todayTotal, setTodayTotal] = useState(0);    // 오늘 전체 등록 공수(h)
+  const [todayWorklogs, setTodayWorklogs] = useState([]); // 당일 작업기록 목록
   const [searching, setSearching] = useState(false);
   const [jiraHost, setJiraHost] = useState("");
   const [searchingDirect, setSearchingDirect] = useState(false);
@@ -125,6 +126,7 @@ export default function WorklogInput() {
         const todayLogs = logs.filter(l => l.started.startsWith(todayStr));
         const todayHrs = todayLogs.reduce((sum, l) => sum + (l.timeSpentSeconds || 0), 0) / 3600;
         setTodayTotal(todayHrs);
+        setTodayWorklogs(todayLogs);
 
         // 완료 상태 체크 함수
         const isDone = (status) => {
@@ -311,6 +313,7 @@ export default function WorklogInput() {
       alert("✅ Jira에 공수 등록 완료!");
       // 폼 초기화 혹은 분석 페이지로 이동
       setComment("");
+      loadRecentIssues();
       router.refresh();
       //router.push("/worklog");
     } catch (err) {
@@ -582,6 +585,42 @@ export default function WorklogInput() {
               <li><strong>공수원칙:</strong> 실제 시간 대비 약 1.25배 scale-up (일일 총 8~11h 권장)</li>
               <li><strong>Daily 원칙:</strong> 그날 작업은 그날 바로 등록하세요.</li>
             </ul>
+          </div>
+
+          {/* 당일 작업 기록 목록 */}
+          <div className="card" style={{ marginTop: "1.5rem" }}>
+            <h3 style={{ fontSize: "0.9rem", color: "white", marginBottom: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>📅 당일 작업 기록 목록</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--accent-color)" }}>오늘 총 {todayWorklogs.length}건</span>
+            </h3>
+            {todayWorklogs.length === 0 ? (
+              <p style={{ fontSize: "0.8rem", color: "#666", textAlign: "center", margin: "1.5rem 0" }}>오늘 등록된 공수 기록이 없습니다.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "400px", overflowY: "auto", paddingRight: "4px" }}>
+                {todayWorklogs.map(log => (
+                  <div key={log.id} style={{ padding: "0.8rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid #222" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", alignItems: "center" }}>
+                      <span style={{ fontWeight: "bold", fontSize: "0.8rem", color: "var(--accent-color)" }}>
+                        {jiraHost ? (
+                          <a href={`${jiraHost}/browse/${log.issueKey}`} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>
+                            {log.issueKey} 🔗
+                          </a>
+                        ) : log.issueKey}
+                      </span>
+                      <span style={{ fontSize: "0.75rem", background: "rgba(52,211,153,0.1)", color: "#34d399", padding: "2px 6px", borderRadius: "4px" }}>
+                        {log.timeSpent}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "0.82rem", color: "white", fontWeight: "bold", marginBottom: "0.4rem" }}>
+                      {log.issueSummary}
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "#aaa", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "0.4rem", wordBreak: "break-all", fontFamily: "monospace" }}>
+                      {log.comment}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
