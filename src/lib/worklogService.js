@@ -131,6 +131,26 @@ export async function getWorklogs({
   } else if (targetType === "me") {
     const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
     appliedJql = `${projectClause} AND worklogAuthor in (currentUser()) AND ${dateCond}`;
+    
+    // me 타겟인 경우 타인 워크로그가 섞여서 다운로드되지 않도록 현재 사용자 정보 조회 및 필터 지정
+    try {
+      const myselfUrl = `${cleanDomain}/rest/api/2/myself`;
+      const myselfRes = await fetchWithRetry(myselfUrl, { method: "GET", headers }, debugLog);
+      if (myselfRes.ok) {
+        const myself = await myselfRes.json();
+        const myName = (myself.name || "").trim();
+        const myAccountId = (myself.accountId || "").trim();
+        const myDisplayName = (myself.displayName || "").trim();
+        
+        validDtAccounts = [myName, myAccountId].filter(Boolean);
+        validNames = [myDisplayName].filter(Boolean);
+        isCustomTarget = true;
+        
+        debugLog.push(`[Service] currentUser 검증 설정 완료: ${myDisplayName} (${myName})`);
+      }
+    } catch (e) {
+      debugLog.push(`[Service] currentUser 검증 설정 실패: ${e.message}`);
+    }
   } else {
     const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
     appliedJql = `${projectClause} AND ${dateCond}`;
