@@ -113,6 +113,12 @@ export async function getWorklogs({
       validDtAccounts = [...new Set(targetUsers.map(u => u.dt_account).filter(Boolean))];
       validNames = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
       isCustomTarget = true;
+      
+      // JQL에 worklogAuthor 조건이 없고 유효한 계정이 존재한다면 JQL 조건에 추가하여 데이터 대폭 축소
+      if (!appliedJql.toLowerCase().includes("worklogauthor") && validDtAccounts.length > 0) {
+        const authorList = validDtAccounts.map(a => `${a}`).join(", ");
+        appliedJql = `${appliedJql} AND worklogAuthor in (${authorList})`;
+      }
     }
   } else if (targetType === "custom" && targetUsers.length > 0) {
     validDtAccounts = [...new Set(targetUsers.map(u => u.dt_account).filter(Boolean))];
@@ -132,11 +138,11 @@ export async function getWorklogs({
 
   debugLog.push(`[Service] JQL: ${appliedJql}`);
 
-  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "worklog"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
+  const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "worklog", "assignee"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
   debugLog.push(`[Service] 이슈 수집 완료: ${allIssues.length}건`);
-  console.log(`[worklogService] JQL="${appliedJql}" -> 검색된 이슈 수: ${allIssues.length}`);
+  debugLog.push(`[Service] JQL="${appliedJql}" -> 검색된 이슈 수: ${allIssues.length}`);
   if (allIssues.length > 0) {
-    console.log(`[worklogService] Sample issue: key=${allIssues[0].key}, hasWorklog=${!!allIssues[0].fields?.worklog}, logsLen=${allIssues[0].fields?.worklog?.worklogs?.length}`);
+    debugLog.push(`[Service] Sample issue: key=${allIssues[0].key}, hasWorklog=${!!allIssues[0].fields?.worklog}, logsLen=${allIssues[0].fields?.worklog?.worklogs?.length}`);
   }
   
   const allWorklogs = [];
@@ -156,8 +162,9 @@ export async function getWorklogs({
       logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
     }
     
+    // 콘솔 로그 도배를 지우고 내부 디버그 데이터 분석에 사용
     if (logs.length > 0) {
-      console.log(`[worklogService] Issue ${issue.key}: raw logs count = ${logs.length}`);
+      debugLog.push(`[Service] Issue ${issue.key}: raw logs count = ${logs.length}`);
     }
 
     for (const w of logs) {
@@ -170,7 +177,6 @@ export async function getWorklogs({
         const sd = (w.started || "").split("T")[0];
         if (!sd || sd < startDate || sd > endDate) {
           statDateFiltered++;
-          console.log(`[worklogService Drop Date] Issue=${issue.key}, LogID=${w.id}, started=${w.started} (${sd}) vs range (${startDate}~${endDate})`);
           continue;
         }
       }
@@ -249,6 +255,7 @@ export async function getWorklogs({
         timeSpentSeconds: secs,
         timeSpent: Number.isInteger(hrs) ? `${hrs}h` : `${parseFloat(hrs.toFixed(2))}h`,
         comment: commentText || "(작업 내용 미기재)",
+        assignee: issue.fields.assignee?.displayName || issue.fields.assignee?.name || "-",
         originalEstimate: issue.fields.timetracking?.originalEstimate || "-",
         remainingEstimate: issue.fields.timetracking?.remainingEstimate || "-",
         issueTimeSpent:  issue.fields.timetracking?.timeSpent || "-",

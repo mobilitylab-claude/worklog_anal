@@ -140,7 +140,8 @@ export default function ProjectGantt() {
       // Jira JQL에서 worklogComment ~ "..." 가 일부 버전에서 에러를 유발할 수 있습니다.
       // 텍스트 전체 검색(text ~)으로 프로젝트 코드가 포함된 이슈를 빠르게 찾도록 변경합니다.
       const projCodes = proj.code.split(",").map(c => c.trim()).filter(Boolean);
-      const jql = `updated >= "${start}" AND (${textJql})`;
+      const textJql = projCodes.map(code => `text ~ "${code}"`).join(" OR ");
+      const jql = textJql ? `updated >= "${start}" AND (${textJql})` : `updated >= "${start}"`;
 
       // 1시간 세션 캐시 확인 (Jira API 호출 최소화)
       const cacheKey = `gantt_cache_v2_${proj.code}`;
@@ -182,10 +183,12 @@ export default function ProjectGantt() {
       const isResolvedCheck = (status) => ["resolved", "closed", "done", "완료", "해결됨"].includes((status || "").toLowerCase());
 
       logs.forEach(log => {
-        // Double check project code in comment
+        // 서버에서 파싱해 준 프로젝트 코드와 계약 과제(proj.code) 목록 대조
+        const logProjCode = (log.projectCode || "").trim().toLowerCase();
+        const projCodes = proj.code.split(",").map(c => c.trim().toLowerCase()).filter(Boolean);
+        if (!logProjCode || !projCodes.includes(logProjCode)) return;
+
         const comment = log.comment || "";
-        const projCodes = proj.code.split(",").map(c => c.trim()).filter(Boolean);
-        if (!projCodes.some(c => comment.includes(c))) return;
 
         if (!issueMap[log.issueKey]) {
           const actualDueDate = log.dueDate && log.dueDate !== "-" ? log.dueDate : null;

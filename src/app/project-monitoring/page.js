@@ -110,8 +110,19 @@ export default function ProjectMonitoring() {
       const endDateNext = endDateObj.toISOString().split("T")[0];
 
       let dateJql = `updated >= "${startDate}"`;
-      let orFilters = [];
-      if (parentKey) orFilters.push(`parent = "${parentKey}"`);
+      let andFilters = [];
+      
+      if (parentKey) {
+        andFilters.push(`parent = "${parentKey}"`);
+      }
+      
+      if (projectCode && projectCode.trim()) {
+        const codes = projectCode.split(",").map(c => c.trim()).filter(Boolean);
+        if (codes.length > 0) {
+          const textCond = codes.map(c => `text ~ "${c}"`).join(" OR ");
+          andFilters.push(`(${textCond})`);
+        }
+      }
 
       let targetUsersData = [];
       if (targetMode !== "all" && selectedUsers.length > 0) {
@@ -121,8 +132,8 @@ export default function ProjectMonitoring() {
       }
 
       let finalJql = dateJql;
-      if (orFilters.length > 0) {
-        finalJql += ` AND (${orFilters.join(" AND ")})`;
+      if (andFilters.length > 0) {
+        finalJql += ` AND ${andFilters.join(" AND ")}`;
       }
 
       const res = await fetch("/api/worklogs", {
@@ -143,28 +154,12 @@ export default function ProjectMonitoring() {
       if (!res.ok) throw new Error(data.error || "조회 실패");
 
       const mappedLogs = (data.worklogs || []).map(w => {
-        const text = (w.comment || "").trim();
-        let parts = [];
-        let current = "";
-        for (let i = 0; i < text.length; i++) {
-          if (text[i] === '/' && text.substring(i - 6, i) !== 'https:' && text.substring(i - 5, i) !== 'http:') {
-            parts.push(current.trim());
-            current = "";
-          } else {
-            current += text[i];
-          }
-        }
-        parts.push(current.trim());
-
-        let pCode = "";
-        let taskType = "미분류";
-        
-        if (parts.length >= 2 && parts[0].length < 30) {
-          pCode = parts[0];
-          taskType = parts[1];
-        }
-
-        return { ...w, pCode, taskType };
+        // 서버에서 이미 정교하게 파싱해 제공하는 projectCode와 workType을 매핑하여 사용
+        return { 
+          ...w, 
+          pCode: w.projectCode || "", 
+          taskType: w.workType || "미분류" 
+        };
       });
 
       const filtered = projectCode 
