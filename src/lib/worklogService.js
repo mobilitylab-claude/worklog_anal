@@ -54,6 +54,8 @@ async function fetchAllWorklogsForIssue(cleanDomain, headers, issueKey, debugLog
     }
     if (logs.length === 0 || allWorklogs.length >= total) break;
     startAt += logs.length;
+    // JIRA 서버 보호를 위한 슬립 격리 배치 (개별 API 순회 조회 시에만 작동)
+    await sleep(300);
   }
   return allWorklogs;
 }
@@ -62,11 +64,12 @@ export async function getWorklogs({
   startDate, endDate,
   includeKeyword, excludeKeyword,
   targetType, targetUsers = [],
-  overrideJql,
+  overrideJql, project,
+  domain, apiToken,
   debugLog = []
 }) {
-  const JIRA_DOMAIN = process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
-  const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+  const JIRA_DOMAIN = domain || process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
+  const JIRA_API_TOKEN = apiToken || process.env.JIRA_API_TOKEN;
 
   if (!JIRA_DOMAIN || !JIRA_API_TOKEN) {
     throw new Error("Jira 설정이 누락되었습니다 (Domain/Token)");

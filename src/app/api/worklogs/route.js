@@ -1,409 +1,51 @@
 import { NextResponse } from "next/server";
-import { fetchJiraSearch } from "@/lib/jiraClient";
-
-const extractTextFromADF = (node) => {
-  if (typeof node === "string") return node;
-  if (!node) return "";
-  let text = "";
-  if (node.text) text += node.text;
-  if (node.content && Array.isArray(node.content)) {
-    text += node.content.map(extractTextFromADF).join(" ");
-  }
-  return text;
-};
-
-/** ms 단위 sleep */
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-/**
- * Rate Limit(429)를 고려한 fetch 래퍼 — 지수 백오프(Exponential Backoff)
- * - Retry-After:0 버그 수정, 최소 3초 보장, 최대 10회 재시도
- */
-async function fetchWithRetry(url, options, debugLog, maxRetry=10, minDelay=3000, maxDelay=60000) {
-  let lastRes;
-  for (let attempt = 1; attempt <= maxRetry; attempt++) {
-    const res = await fetch(url, options);
-    if (res.status !== 429) return res;
-    lastRes = res;
-    const raw = res.headers.get("Retry-After");
-    const sec = raw ? parseInt(raw, 10) : NaN;
-    let wait = (!isNaN(sec) && sec > 0)
-      ? Math.min(sec * 1000, maxDelay)
-      : Math.min(minDelay * Math.pow(2, attempt - 1), maxDelay);
-    wait = Math.max(wait, minDelay);
-    if (debugLog) debugLog.push(`[Rate Limit] 429 → ${(wait/1000).toFixed(1)}s 대기 (${attempt}/${maxRetry}): ${url.split("?")[0].split("/").slice(-3).join("/")}`);
-    await sleep(wait);
-  }
-  if (debugLog) debugLog.push(`[Rate Limit 실패] ${maxRetry}회 소진: ${url.split("?")[0].split("/").slice(-3).join("/")}`);
-  return lastRes;
-}
-
-/**
- * 이슈 하나의 전체 워크로그를 완전 수집 (Jira total 기반 페이지네이션)
- * - Jira Server는 기본 20건 반환, total로 전체 건수를 알 수 있음
- * - maxResults=5000 요청해도 서버마다 실제 반환 건수가 다르므로 반드시 루프 필요
- */
-async function fetchAllWorklogsForIssue(cleanDomain, headers, issueKey, debugLog) {
-  const allWorklogs = [];
-  const seenIds = new Set();
-  let startAt = 0;
-  let loopCount = 0;
-  const MAX_LOOPS = 200;
-
-  while (loopCount < MAX_LOOPS) {
-    loopCount++;
-    const url = `${cleanDomain}/rest/api/2/issue/${issueKey}/worklog?startAt=${startAt}&maxResults=1000`;
-    // fetchWithRetry: 429 발생 시 자동 재시도
-    const res = await fetchWithRetry(url, { method: "GET", headers }, debugLog);
-
-    if (!res.ok) {
-      debugLog.push(`[워크로그 오류] ${issueKey} startAt=${startAt}: HTTP ${res.status}`);
-      break;
-    }
-
-    const data = await res.json();
-    const total = data.total ?? 0;
-    const logs  = data.worklogs || [];
-
-    let added = 0;
-    for (const log of logs) {
-      if (!seenIds.has(log.id)) {
-        seenIds.add(log.id);
-        allWorklogs.push(log);
-        added++;
-      }
-    }
-
-    if (logs.length === 0 || allWorklogs.length >= total) break;
-    startAt += logs.length;
-  }
-
-  if (loopCount >= MAX_LOOPS) {
-    debugLog.push(`[경고] ${issueKey}: MAX_LOOPS 도달`);
-  }
-
-  return allWorklogs;
-}
+import { getWorklogs } from "@/lib/worklogService";
 
 export async function POST(request) {
   const debugLog = [];
 
   try {
-    const {
-      startDate, endDate,
-      includeKeyword, excludeKeyword,
-      targetType, targetUsers,
-      overrideJql, project
-    } = await request.json();
-
-    let projectClause = "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
-    if (project && project.trim()) {
-      const p = project.trim();
-      projectClause = (p.includes(' ') || p.includes(',')) ? `project in (${p})` : `project = "${p}"`;
-    } else if (process.env.JIRA_PROJECT) {
-      projectClause = process.env.JIRA_PROJECT;
-    }
-
+    const body = await request.json();
     const xJiraToken = request.headers.get("x-jira-token");
-    const JIRA_DOMAIN    = process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
+    const JIRA_DOMAIN = process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
     const JIRA_API_TOKEN = xJiraToken || process.env.JIRA_API_TOKEN;
-    const JIRA_EMAIL     = process.env.JIRA_EMAIL || "";
 
-    if (!JIRA_DOMAIN || !JIRA_API_TOKEN) {
-      throw new Error("환경변수(.env) 미설정 (JIRA_DOMAIN, JIRA_API_TOKEN)");
-    }
+    const cleanDomain = JIRA_DOMAIN ? JIRA_DOMAIN.replace(/\/$/, "") : "";
 
-    const cleanDomain = JIRA_DOMAIN.replace(/\/$/, "");
+    // worklogService 모듈 함수를 호출하여 수집 및 필터링 일원화
+    const worklogs = await getWorklogs({
+      ...body,
+      domain: cleanDomain,
+      apiToken: JIRA_API_TOKEN,
+      debugLog
+    });
 
-    const headers = {
-      "Authorization": `Bearer ${JIRA_API_TOKEN}`,
-      "Content-Type":  "application/json",
-      "Accept":        "application/json",
-    };
+    // debugLog에 기록된 JQL을 추출하여 응답 정보 구성
+    const jqlLogLine = debugLog.find(line => line.startsWith("[Service] JQL:"));
+    const usedJql = jqlLogLine ? jqlLogLine.replace("[Service] JQL:", "").trim() : "";
 
-    // ── 1. JQL 결정 + 필터 대상 계정 추출 ────────────────────────
-    const endDateObj  = new Date(endDate);
-    endDateObj.setDate(endDateObj.getDate() + 1);
-    const endDateNext = endDateObj.toISOString().split("T")[0];
+    // 제외된 작성자 추출 (디버그 통계 파싱)
+    const excludedLine = debugLog.find(line => line.startsWith("[⚠️ 제외된 작성자]"));
+    const excludedAuthors = excludedLine 
+      ? excludedLine.replace("[⚠️ 제외된 작성자]", "").split("|").map(s => s.trim()).filter(Boolean)
+      : [];
 
-    let validDtAccounts = [];
-    let validNames      = [];
-    let isCustomTarget  = false;
-
-    // /myself API로 currentUser 정확 조회 (JIRA_EMAIL != Jira username 문제 해결)
-    let myselfName = "", myselfAccountId = "", myselfDisplayName = "";
-    try {
-      const mr = await fetch(`${cleanDomain}/rest/api/2/myself`, { method: "GET", headers });
-      if (mr.ok) {
-        const m = await mr.json();
-        myselfName      = (m.name      || "").trim();
-        myselfAccountId = (m.accountId || "").trim();
-        myselfDisplayName = (m.displayName || "").trim();
-        debugLog.push(`[currentUser] name="${myselfName}" accountId="${myselfAccountId}" display="${myselfDisplayName}"`);
-      } else debugLog.push(`[currentUser] /myself HTTP ${mr.status}`);
-    } catch(e) { debugLog.push(`[currentUser] err: ${e.message}`); }
-
-    let appliedJql = "";
-
-    if (overrideJql && overrideJql.trim()) {
-      let cleaned = overrideJql.trim();
-      if (!cleaned.toLowerCase().includes('project')) {
-        appliedJql = `${projectClause} AND (${cleaned})`;
-      } else {
-        appliedJql = cleaned;
-      }
-      if (targetUsers && targetUsers.length > 0) {
-        const rawAccounts = targetUsers.map(u => u.dt_account).filter(Boolean);
-        validDtAccounts = [...new Set([
-          ...rawAccounts,
-          ...rawAccounts.map(a => a.toLowerCase()),
-          ...rawAccounts.map(a => a.toUpperCase())
-        ])];
-        validNames      = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
-        isCustomTarget  = true;
-        debugLog.push(`[JQL] 수동 입력 + 작성자 필터 적용 (${validDtAccounts.length}명)`);
-      } else {
-        debugLog.push(`[JQL] 수동 입력, 작성자 필터 없음 → 전체 포함`);
-      }
-    } else if (targetType === "custom" && targetUsers && targetUsers.length > 0) {
-      const rawAccounts = targetUsers.map(u => u.dt_account).filter(Boolean);
-      validDtAccounts = [...new Set([
-        ...rawAccounts,
-        ...rawAccounts.map(a => a.toLowerCase()),
-        ...rawAccounts.map(a => a.toUpperCase())
-      ])];
-      validNames      = [...new Set(targetUsers.map(u => u.name).filter(Boolean))];
-      isCustomTarget  = true;
-      const authorList = validDtAccounts.length > 0 ? validDtAccounts.map(a => `${a}`).join(", ") : "";
-      const authorCond = authorList ? ` AND worklogAuthor in (${authorList})` : "";
-      const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
-      appliedJql      = `${projectClause}${authorCond} AND ${dateCond}`;
-      debugLog.push(`[JQL] 자동 생성 — 대상 username: [${validDtAccounts.join(", ")}]`);
-    } else {
-      const myAuth = myselfName || myselfAccountId || "currentUser()";
-      const dateCond = (startDate && endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
-      appliedJql = `${projectClause} AND worklogAuthor in (${myAuth}) AND ${dateCond}`;
-      debugLog.push(`[JQL] 자동 생성 — 나의 워크로그 (${myAuth})`);
-    }
-
-    debugLog.push(`[실행 JQL] ${appliedJql}`);
-    debugLog.push(`[날짜 범위] ${startDate} ~ ${endDate}  (JQL: >= ${startDate} AND < ${endDateNext})`);
-
-    // ── 2. 이슈 전체 페이지네이션 수집 (공용 클라이언트 사용) ───────────
-    debugLog.push("[이슈 수집] 시작 (전체 수집 모드)");
-    const allIssues = await fetchJiraSearch(appliedJql, ["summary", "issuetype", "status", "project", "timetracking", "duedate", "created", "updated", "assignee", "worklog"], { domain: cleanDomain, apiToken: JIRA_API_TOKEN });
-    debugLog.push(`[이슈 총계] ${allIssues.length}개 이슈 로드 완료`);
-    console.log(`[Worklog API] JQL="${appliedJql}" -> 검색된 이슈 수: ${allIssues.length}`);
-    if (allIssues.length > 0) {
-      const sample = allIssues[0];
-      console.log(`[Worklog API] Sample issue: key=${sample.key}, hasWorklogField=${!!sample.fields?.worklog}, embLogsLen=${sample.fields?.worklog?.worklogs?.length}, embTotal=${sample.fields?.worklog?.total}`);
-    }
-
-    // ── 3. 이슈별 워크로그 순차 수집 + 2차 필터 ─────────────────
-    const allWorklogs    = [];
-    const seenWorklogIds = new Set();
-    const excludedAuthors = new Set();
-    let statTotal=0, statDropDup=0, statDropDate=0, statDropAuthor=0;
-
-    // 수동 JQL 단독(targetUsers 없음): 2차 날짜 필터 미적용 → JQL 날짜 조건 신뢰
-    // 자동 JQL / 수동 JQL+targetUsers: UI startDate~endDate로 2차 필터 적용
-    const applyDateFilter = !(overrideJql && overrideJql.trim() && !isCustomTarget);
-    debugLog.push(`[2차 날짜 필터] ${applyDateFilter ? `적용 (${startDate}~${endDate})` : "미적용 — 수동 JQL 신뢰"}`);
-
-    const chunkArray = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
-    const issueChunks = chunkArray(allIssues, 15);
-    
-    for (const chunk of issueChunks) {
-      const chunkResults = await Promise.all(chunk.map(async (issue) => {
-        try {
-          const embWl = issue.fields?.worklog;
-          let logs = [];
-          if (embWl && Array.isArray(embWl.worklogs) && embWl.worklogs.length > 0 && (typeof embWl.total === 'undefined' || embWl.total <= embWl.worklogs.length)) {
-            logs = embWl.worklogs;
-          } else {
-            logs = await fetchAllWorklogsForIssue(cleanDomain, headers, issue.key, debugLog);
-          }
-          return { issue, logs };
-        } catch (e) {
-          debugLog.push(`[Error] ${issue.key} 워크로그 수집 실패: ${e.message}`);
-          return { issue, logs: [] };
-        }
-      }));
-
-      await sleep(100);
-
-      for (const { issue, logs } of chunkResults) {
-        let keptInIssue = 0;
-        if (logs.length > 0) {
-          console.log(`[Worklog API] Issue ${issue.key}: raw logs fetched count = ${logs.length}`);
-        }
-
-        for (const w of logs) {
-        statTotal++;
-        if (seenWorklogIds.has(w.id)) { statDropDup++; continue; }
-        seenWorklogIds.add(w.id);
-
-        // ── 날짜 2차 필터 ──
-        if (applyDateFilter) {
-          const sd = (w.started || "").split("T")[0];
-          if (!sd || sd < startDate || sd > endDate) { 
-            statDropDate++; 
-            console.log(`[Worklog API Drop Date] Issue=${issue.key}, LogID=${w.id}, started=${w.started} (${sd}) vs range (${startDate}~${endDate})`);
-            continue; 
-          }
-        }
-
-        // ── 작성자 2차 필터 ──
-        if (isCustomTarget) {
-          // 자동 JQL(isCustomTarget && !overrideJql): JQL이 이미 worklogAuthor 제한함
-          // → 이슈 내 다른 사람 워크로그 제거를 위해 2차 필터 적용
-          const wu = (w.author?.name        || "").trim().toLowerCase();
-          const wa = (w.author?.accountId   || "").trim().toLowerCase();
-          const wd = (w.author?.displayName || "").trim();
-          const mAcc = wu.length > 0 && validDtAccounts.some(a =>
-            a.trim().toLowerCase() === wu ||
-            (wa.length > 0 && a.trim().toLowerCase() === wa)
-          );
-          const mDn = wd.length > 0 && validNames.some(n => {
-            const d = n.trim(); if (!d) return false;
-            return d === wd || wd.startsWith(d) || d.startsWith(wd);
-          });
-          if (!mAcc && !mDn) {
-            statDropAuthor++;
-            console.log(`[Worklog API Drop CustomAuthor] Issue=${issue.key}, LogID=${w.id}, author.name=${wu}, author.displayName=${wd}`);
-            const key = `${wd}(${w.author?.name || "?"})`;
-            if (!excludedAuthors.has(key) && excludedAuthors.size < 30) excludedAuthors.add(key);
-            continue;
-          }
-        } else if (!overrideJql && !isCustomTarget) {
-          // "me" 자동 모드 — /myself로 얻은 name/accountId로 비교
-          if (myselfName || myselfAccountId || typeof myselfDisplayName !== "undefined") {
-            const wu = (w.author?.name      || "").trim().toLowerCase();
-            const wa = (w.author?.accountId || "").trim().toLowerCase();
-            const wd = (w.author?.displayName || "").trim();
-            
-            const matchName = myselfName && wu === myselfName.toLowerCase();
-            const matchAcc  = myselfAccountId && wa === myselfAccountId.toLowerCase();
-            const matchDisp = typeof myselfDisplayName !== "undefined" && myselfDisplayName && (wd === myselfDisplayName || wd.startsWith(myselfDisplayName) || myselfDisplayName.startsWith(wd));
-            
-            if (!matchName && !matchAcc && !matchDisp) {
-              statDropAuthor++;
-              console.log(`[Worklog API Drop MeAuthor] Issue=${issue.key}, LogID=${w.id}, author=${wu}/${wd} vs myself=${myselfName}/${myselfDisplayName}`);
-              debugLog.push(`[작성자 필터 제외] 나: name="${myselfName}", acc="${myselfAccountId}", disp="${myselfDisplayName}" <-> 워크로그: name="${w.author?.name}", acc="${w.author?.accountId}", disp="${wd}"`);
-              continue;
-            }
-          }
-        }
-        // overrideJql 단독(targetUsers 없음): 필터 없이 전체 포함
-
-        // ── 코멘트 추출 ──
-        let commentText = "";
-        if (typeof w.comment === "string") {
-          commentText = w.comment;
-        } else if (w.comment && typeof w.comment === "object") {
-          commentText = extractTextFromADF(w.comment);
-          if (!commentText) commentText = JSON.stringify(w.comment);
-        }
-
-        // ── 포맷 파싱 (예: Project / Type / Content 또는 [Project] [Type] 내용) ──
-        let parsedProjectCode = "";
-        let parsedWorkType = "";
-        const cleanComment = (commentText || "").trim();
-        
-        // 1. "/" 구분자 지원: Project / Type / Content (최소 2개 세그먼트 필요)
-        const slashMatch = cleanComment.match(/^([^/]+)\s*\/\s*([^/]+)(?:\s*\/[\s\S]*)?$/);
-        // 2. "[]" 구분자 지원: [Project] [Type]
-        const bracketMatch = cleanComment.match(/^\[([^\]]+)\]\s*\[([^\]]+)\]/);
-        
-        if (slashMatch) {
-          parsedProjectCode = slashMatch[1].trim();
-          parsedWorkType = slashMatch[2].trim();
-        } else if (bracketMatch) {
-          parsedProjectCode = bracketMatch[1].trim();
-          parsedWorkType = bracketMatch[2].trim();
-        } else {
-          // 단일 대괄호 등 기타 패턴
-          const singleBracket = cleanComment.match(/^\[([^\]]+)\]/);
-          if (singleBracket) {
-            parsedProjectCode = singleBracket[1].trim();
-            parsedWorkType = "기타";
-          }
-        }
-
-        // ── 키워드 필터 ──
-        const includes = (includeKeyword || "").split(",").map(s => s.trim()).filter(Boolean);
-        const excludes = (excludeKeyword || "").split(",").map(s => s.trim()).filter(Boolean);
-        const txt = commentText || "";
-        if (includes.length > 0 && !includes.some(kw => txt.includes(kw))) continue;
-        if (excludes.length > 0 &&  excludes.some(kw => txt.includes(kw))) continue;
-
-        // ── 시간 변환 (timeSpentSeconds 기준, Jira 기본: 1d=8h, 1w=40h) ──
-        const secs      = w.timeSpentSeconds || 0;
-        const hrs       = secs / 3600;
-        const timeSpentH = Number.isInteger(hrs) ? `${hrs}h` : `${parseFloat(hrs.toFixed(2))}h`;
-
-        // 이슈 필드 추출
-        let issueStartDate = issue.fields.created ? issue.fields.created.split("T")[0] : "-";
-        
-        allWorklogs.push({
-          id:              w.id,
-          issueKey:        issue.key,
-          issueSummary:    issue.fields.summary,
-          issueType:       issue.fields.issuetype?.name || "-",
-          issueStatus:     issue.fields.status?.name    || "-",
-          projectKey:      issue.fields.project?.key    || "-",
-          projectName:     issue.fields.project?.name   || "-",
-          projectCode:     parsedProjectCode || "",
-          workType:        parsedWorkType    || "",
-          author:          w.author?.displayName || w.author?.name || "",
-          authorUsername:  w.author?.name        || "",
-          started:         w.started,
-          timeSpent:       timeSpentH,
-          timeSpentRaw:    w.timeSpent,
-          timeSpentSeconds: secs,
-          comment:         commentText || "(작업 내용 미기재)",
-          
-          // 새로 추가된 필드들 (Estimate, Remaining, Logged, Start date, due date)
-          originalEstimate: issue.fields.timetracking?.originalEstimate || "-",
-          remainingEstimate: issue.fields.timetracking?.remainingEstimate || "-",
-          issueTimeSpent:  issue.fields.timetracking?.timeSpent || "-",
-          originalEstimateSeconds: issue.fields.timetracking?.originalEstimateSeconds || 0,
-          remainingEstimateSeconds: issue.fields.timetracking?.remainingEstimateSeconds || 0,
-          issueTimeSpentSeconds: issue.fields.timetracking?.timeSpentSeconds || 0,
-          issueStartDate:  issueStartDate,
-          createDate:      issue.fields.created ? issue.fields.created.split("T")[0] : "-",
-          updateDate:      issue.fields.updated ? issue.fields.updated.split("T")[0] : "-",
-          dueDate:         issue.fields.duedate || "-",
-          assignee:        issue.fields.assignee?.displayName || issue.fields.assignee?.name || "Unassigned",
-        });
-        keptInIssue++;
-      }
-
-      if (keptInIssue > 0) {
-        debugLog.push(`[${issue.key}] 전체=${logs.length}건 → 조건 충족=${keptInIssue}건`);
-      }
-      } // end chunkResults loop
-    } // end chunk loop
-
-    allWorklogs.sort((a, b) => new Date(b.started) - new Date(a.started));
-
-    // 디버그 통계 요약
-    debugLog.push(`[필터 통계] 전체=${statTotal} | 중복=${statDropDup} | 날짜제외=${statDropDate} | 작성자제외=${statDropAuthor} | 최종=${allWorklogs.length}`);
-    const authorSample = [...new Set(allWorklogs.map(w => `${w.author}(${w.authorUsername})`))].slice(0, 30);
-    if (excludedAuthors.size > 0) debugLog.push(`[⚠️ 제외된 작성자] ${[...excludedAuthors].join(" | ")}`);
-    debugLog.push(`[수집된 작성자] ${authorSample.join(" | ")}`);
+    const totalIssuesLine = debugLog.find(line => line.startsWith("[Service] 이슈 수집 완료:"));
+    const totalIssues = totalIssuesLine 
+      ? parseInt(totalIssuesLine.match(/\d+/)?.[0] || "0", 10) 
+      : 0;
 
     return NextResponse.json({
-      worklogs:    allWorklogs,
-      jiraHost:    cleanDomain,
-      usedJql:     appliedJql,
+      worklogs,
+      jiraHost: cleanDomain,
+      usedJql,
       debugLog,
-      totalIssues: allIssues.length,
-      excludedAuthors: [...excludedAuthors],
+      totalIssues,
+      excludedAuthors
     });
 
   } catch (error) {
-    debugLog.push(`[오류] ${error.message}`);
+    debugLog.push(`[라우터 오류] ${error.message}`);
     return NextResponse.json({ error: error.message, debugLog }, { status: 500 });
   }
 }
