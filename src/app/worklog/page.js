@@ -81,7 +81,20 @@ export default function WorklogAnalyzer() {
     endDateObj.setDate(endDateObj.getDate() + 1);
     const endDateNext = endDateObj.toISOString().split("T")[0];
     const dateCond = (startDate && endDate && startDate !== endDate) ? `worklogDate >= ${startDate} AND worklogDate < ${endDateNext}` : `worklogDate >= ${startDate}`;
-    let jql = `project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (currentUser()) AND ${dateCond}`;
+    
+    let authorCond = "";
+    if (targetMode === "me") {
+      authorCond = " AND worklogAuthor in (currentUser())";
+    } else if (selectedUsers.length > 0) {
+      const targetUsers = dbUsers.filter(u => selectedUsers.includes(u.id));
+      const validDtAccounts = [...new Set(targetUsers.map(u => u.dt_account).filter(Boolean))];
+      if (validDtAccounts.length > 0) {
+        const authorList = validDtAccounts.map(a => `${a}`).join(", ");
+        authorCond = ` AND worklogAuthor in (${authorList})`;
+      }
+    }
+
+    let jql = `project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)${authorCond} AND ${dateCond}`;
     setJqlValue(jql);
   }, [startDate, endDate, targetMode, selectedUsers, dbUsers, isManualJql]);
 
