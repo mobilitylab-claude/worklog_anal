@@ -92,14 +92,16 @@ export default function WorklogInput() {
   // ── 최종 포맷 미리보기 ─────────────────────────────────────────
   // 형식: 계약과제 코드 / 분류 키워드 / 작업 내용 (대괄호 및 이슈번호 제외)
   const finalComment = useMemo(() => {
-    const prefix = `${projectCode} / ${selectedKw || "키워드"} / `;
+    const matchedProj = projectCodes.find(p => p.code === projectCode);
+    const displayCode = matchedProj?.repr_project_code || projectCode;
+    const prefix = `${displayCode} / ${selectedKw || "키워드"} / `;
 
     // URL을 Jira Wiki 형식의 링크로 변환 ([url])
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const formattedComment = comment.replace(urlRegex, '[$1]');
 
     return `${prefix}${formattedComment}`;
-  }, [projectCode, selectedKw, comment]);
+  }, [projectCode, projectCodes, selectedKw, comment]);
 
   // ── 최근 이슈 로드 (분석 기능을 통해 간접적으로 가져옴) ──────────
   const loadRecentIssues = async () => {
@@ -478,6 +480,21 @@ export default function WorklogInput() {
                 style={{ width: "100%", padding: "0.6rem", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "white" }}>
                 {projectCodes.map(p => <option key={p.id} value={p.code}>{p.code} ({p.name})</option>)}
               </select>
+              {(() => {
+                const matchedProj = projectCodes.find(p => p.code === projectCode);
+                if (matchedProj?.repr_project_code) {
+                  return (
+                    <div style={{ marginTop: "0.5rem", fontSize: "0.8rem", color: "#fbbf24", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span>⚠️ 대표 코드 자동 매핑:</span>
+                      <span style={{ fontWeight: "bold", background: "rgba(251,191,36,0.15)", padding: "2px 6px", borderRadius: "4px", border: "1px solid rgba(251,191,36,0.3)" }}>
+                        {matchedProj.repr_project_code}
+                      </span>
+                      <span>으로 공수가 등록됩니다.</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
             <div>
               <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "#888" }}>03. 작업 유형</label>
