@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
+type ViewMode = 'dashboard' | 'monitor' | 'tunnel';
+
 function App() {
+  // ── 네비게이션 및 뷰 상태 ──
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
+  const [currentDashboardPath, setCurrentDashboardPath] = useState('/')
+  const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false)
+  
+  // ── 실시간 모니터링 상태 ──
   const [logs, setLogs] = useState<any[]>(() => {
     try {
       const saved = sessionStorage.getItem('noti_logs');
@@ -13,11 +21,33 @@ function App() {
   const [userStats, setUserStats] = useState<Record<string, number>>({})
   const [userDetails, setUserDetails] = useState<Record<string, any[]>>({})
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
-  const [serverIp, setServerIp] = useState('http://192.168.105.10:3000')
+  const [serverIp, setServerIp] = useState(() => {
+    return localStorage.getItem('jira_server_url') || 'http://localhost:3000';
+  })
   const [isConnected, setIsConnected] = useState(false)
+  const [isConnecting, setIsConnecting] = useState(false)
   const [leftWidth, setLeftWidth] = useState(50)
   const esRef = useRef<EventSource | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const [elapsedTime, setElapsedTime] = useState(0)
+
+  // 서버 URL 저장
+  useEffect(() => {
+    localStorage.setItem('jira_server_url', serverIp);
+  }, [serverIp]);
+
+  // 창 항상 위 고정 토글
+  const toggleAlwaysOnTop = async () => {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+      const nextState = !isAlwaysOnTop;
+      await win.setAlwaysOnTop(nextState);
+      setIsAlwaysOnTop(nextState);
+    } catch (e) {
+      console.warn('Always on top toggle failed:', e);
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -29,14 +59,13 @@ function App() {
   const handleMouseDown = (e: React.MouseEvent) => {
     const startX = e.clientX;
     const startWidth = leftWidth;
-    const containerWidth = window.innerWidth - 40; // 20px padding * 2
+    const containerWidth = window.innerWidth - 40;
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const deltaPercent = (deltaX / containerWidth) * 100;
       let newWidth = startWidth + deltaPercent;
       
-      // 최소 20%, 최대 80%로 제한
       if (newWidth < 20) newWidth = 20;
       if (newWidth > 80) newWidth = 80;
       
@@ -60,8 +89,8 @@ function App() {
       const gainNode = audioCtx.createGain()
       
       oscillator.type = 'sine'
-      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime) // A5 note
-      oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1) // Drop to A4
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1)
       
       gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime)
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1)
@@ -91,7 +120,6 @@ function App() {
         await appWindow.show();
       }
       
-      // 그래픽 컨텍스트 락/블랙스크린 방지를 위한 짧은 대기
       await new Promise(resolve => setTimeout(resolve, 50));
       await appWindow.setFocus();
     } catch (e) {
@@ -100,106 +128,110 @@ function App() {
   }
 
   const connectSSE = () => {
-    if (isConnected) return;
+    if (isConnected || isConnecting) return;
+    setIsConnecting(true);
     
-    setLogs(prev => [{ type: 'info', msg: `[${new Date().toLocaleTimeString()}] 연결 시도 중... ${serverIp}` }, ...prev])
-    const eventSource = new EventSource(`${serverIp}/api/notifications/stream`)
-    esRef.current = eventSource;
+    const targetUrl = serverIp.replace(/\/$/, '');
+    setLogs(prev => [{ type: 'info', msg: `[${new Date().toLocaleTimeString()}] 연결 시도 중... ${targetUrl}` }, ...prev])
+    
+    try {
+      const eventSource = new EventSource(`${targetUrl}/api/notifications/stream`)
+      esRef.current = eventSource;
 
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      const baseLog = { id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false };
-      
-      if (data.type === 'connected') {
-        setLogs(prev => [{ ...baseLog, type: 'success', msg: `[${baseLog.receiveTime}] ✅ 서버 연결 완료: ${data.message}` }, ...prev])
-        setIsConnected(true)
+      eventSource.onopen = () => {
+        setIsConnected(true);
+        setIsConnecting(false);
+      };
 
-        // 연결 완료 시, 즉시 모니터링 대상자들의 오늘 누적 시간 현황을 가져와 화면(도넛 차트)에 모두 표시
-        fetch(`${serverIp}/api/notifications/initial-stats`)
-          .then(res => res.json())
-          .then(resData => {
-            if (resData.success) {
-              if (resData.stats) setUserStats(resData.stats)
-              if (resData.details) setUserDetails(resData.details)
-              
-              if (resData.loadingLogs) {
-                const logsToAdd = resData.loadingLogs.map((msg: string, idx: number) => ({
-                  id: `load-${Date.now()}-${idx}`,
-                  receiveTime: new Date().toLocaleTimeString(),
-                  isRead: true,
-                  type: 'info',
-                  title: '초기 로딩 단계',
-                  message: msg
-                }));
-                // 최신 로그가 위로 오도록 역순으로 추가
-                setLogs(prev => [...logsToAdd.reverse(), ...prev]);
-              }
-            } else {
-              setLogs(prev => [{ ...baseLog, type: 'error', title: '초기 로딩 실패', message: `서버 에러: ${resData.error || '알 수 없음'}` }, ...prev])
-            }
-          })
-          .catch(err => {
-            console.error("초기 통계 데이터 로드 실패:", err);
-            setLogs(prev => [{ ...baseLog, type: 'error', title: '초기 로딩 실패', message: `서버 연결 실패: ${err.message}` }, ...prev])
-          })
-      } else {
-        // 모든 실제 알림에 대해 소리 재생 (작업기록 누적 업데이트 제외)
-        if (data.notiType === 'USER_WORKLOG') {
-          setUserStats(prev => ({
-            ...prev,
-            [data.title]: parseFloat(data.accumulatedHours || "0")
-          }))
-          
-          // 실시간 작업기록 상세 추가
-          if (data.message) {
-            const match = data.message.match(/\[(.*?)\] (.*?)h 작업기록 등록/);
-            if (match) {
-              const issueKey = match[1];
-              const hours = parseFloat(match[2]);
-              setUserDetails(prev => {
-                const userLogs = prev[data.title] || [];
-                // 간단한 중복 체크
-                const isDuplicate = userLogs.some((l: any) => l.issueKey === issueKey && l.hours === hours);
-                if (isDuplicate) return prev;
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        const baseLog = { id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false };
+        
+        if (data.type === 'connected') {
+          setLogs(prev => [{ ...baseLog, type: 'success', msg: `[${baseLog.receiveTime}] ✅ 백엔드 연결 완료: ${data.message}` }, ...prev])
+          setIsConnected(true)
+          setIsConnecting(false)
+
+          fetch(`${targetUrl}/api/notifications/initial-stats`)
+            .then(res => res.json())
+            .then(resData => {
+              if (resData.success) {
+                if (resData.stats) setUserStats(resData.stats)
+                if (resData.details) setUserDetails(resData.details)
                 
-                return {
-                  ...prev,
-                  [data.title]: [
-                    ...userLogs,
-                    { issueKey, hours, comment: '실시간 등록됨', time: new Date().toISOString() }
-                  ]
-                };
+                if (resData.loadingLogs) {
+                  const logsToAdd = resData.loadingLogs.map((msg: string, idx: number) => ({
+                    id: `load-${Date.now()}-${idx}`,
+                    receiveTime: new Date().toLocaleTimeString(),
+                    isRead: true,
+                    type: 'info',
+                    title: '초기 로딩 단계',
+                    message: msg
+                  }));
+                  setLogs(prev => [...logsToAdd.reverse(), ...prev]);
+                }
+              }
+            })
+            .catch(err => {
+              console.error("초기 통계 데이터 로드 실패:", err);
+            })
+        } else {
+          if (data.notiType === 'USER_WORKLOG') {
+            setUserStats(prev => ({
+              ...prev,
+              [data.title]: parseFloat(data.accumulatedHours || "0")
+            }))
+            
+            if (data.message) {
+              const match = data.message.match(/\[(.*?)\] (.*?)h 작업기록 등록/);
+              if (match) {
+                const issueKey = match[1];
+                const hours = parseFloat(match[2]);
+                setUserDetails(prev => {
+                  const userLogs = prev[data.title] || [];
+                  const isDuplicate = userLogs.some((l: any) => l.issueKey === issueKey && l.hours === hours);
+                  if (isDuplicate) return prev;
+                  return {
+                    ...prev,
+                    [data.title]: [
+                      ...userLogs,
+                      { issueKey, hours, comment: '실시간 등록됨', time: new Date().toISOString() }
+                    ]
+                  };
+                });
+              }
+            }
+          } else if (data.notiType === 'ALL_USER_STATS') {
+            if (data.stats) {
+              setUserStats(prev => {
+                const isChanged = Object.keys(data.stats).some(k => data.stats[k] !== prev[k]);
+                if (isChanged) return data.stats;
+                return prev;
               });
             }
+            if (data.details) {
+              setUserDetails(data.details);
+            }
+          } else {
+            playSound()
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(data.title || "JIRA 알림", { body: data.message })
+            }
+            showMainWindow()
+            setLogs(prev => [{ ...data, ...baseLog }, ...prev])
           }
-        } else if (data.notiType === 'ALL_USER_STATS') {
-          if (data.stats) {
-            setUserStats(prev => {
-              const isChanged = Object.keys(data.stats).some(k => data.stats[k] !== prev[k]);
-              if (isChanged) return data.stats;
-              return prev;
-            });
-          }
-          if (data.details) {
-            setUserDetails(data.details);
-          }
-        } else {
-          playSound()
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(data.title || "JIRA 알림", { body: data.message })
-          }
-          // 창 띄우기 (알림 발생 시)
-          showMainWindow()
-          // 에러/경고성 알림만 로그 리스트에 추가
-          setLogs(prev => [{ ...data, ...baseLog }, ...prev])
         }
       }
-    }
 
-    eventSource.onerror = () => {
-      setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'error', msg: `[${new Date().toLocaleTimeString()}] ❌ SSE 연결 오류. 네트워크 문제일 경우 자동 재접속을 시도합니다...` }, ...prev])
-      setIsConnected(false)
-      // 네이티브 자동 재접속을 지원하기 위해 여기서는 close()를 호출하지 않습니다.
+      eventSource.onerror = () => {
+        setIsConnected(false);
+        setIsConnecting(false);
+        setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'error', msg: `[${new Date().toLocaleTimeString()}] ❌ SSE 연결 끊김/재시도 중...` }, ...prev])
+      }
+    } catch (err: any) {
+      setIsConnected(false);
+      setIsConnecting(false);
+      setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'error', msg: `[${new Date().toLocaleTimeString()}] ❌ 연결 에러: ${err.message}` }, ...prev])
     }
   }
 
@@ -209,35 +241,24 @@ function App() {
       esRef.current = null
     }
     setIsConnected(false)
-    setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'info', msg: `[${new Date().toLocaleTimeString()}] 🔌 서버와의 연결을 수동으로 해제했습니다.` }, ...prev])
+    setIsConnecting(false)
+    setLogs(prev => [{ type: 'info', msg: `[${new Date().toLocaleTimeString()}] 🔌 연결 해제됨` }, ...prev])
   }
 
-  // 앱 실행 시 자동 연결 시도 및 클린업
+  // 앱 시작 시 자동 연결
   useEffect(() => {
-    if ('Notification' in window && Notification.permission !== 'granted') {
+    if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
-    
-    // 자동 접속
-    if (!isConnected && !esRef.current) {
-      connectSSE();
-    }
-    
+    connectSSE();
     return () => {
       if (esRef.current) {
         esRef.current.close();
-        esRef.current = null;
       }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }
+  }, [])
 
-  // 로그가 변경될 때마다 sessionStorage에 저장
-  useEffect(() => {
-    sessionStorage.setItem('noti_logs', JSON.stringify(logs));
-  }, [logs]);
-
-  // 페이지 로딩 후 경과 시간 타이머
+  // 타이머
   useEffect(() => {
     const timer = setInterval(() => {
       setElapsedTime(prev => prev + 1);
@@ -245,139 +266,60 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const markAsRead = (id: number) => {
+  // 로그 저장
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('noti_logs', JSON.stringify(logs.slice(0, 100)));
+    } catch (e) {}
+  }, [logs]);
+
+  const markAsRead = (id: any) => {
     setLogs(prev => prev.map(log => log.id === id ? { ...log, isRead: true } : log))
   }
 
-  // 카드 렌더링 함수
-  const renderLogCard = (log: any, index: number) => {
-    // 1. 일반 정보 로그
-    if (log.type === 'info' || log.type === 'success' || log.type === 'error') {
-      const color = log.type === 'error' ? '#fca5a5' : log.type === 'success' ? '#86efac' : '#ddd'
-      return <div key={log.id || index} style={{ marginBottom: '8px', fontSize: '0.85rem', color }}>{log.msg}</div>
-    }
-
-    // 2. 미등록 프로젝트 / 3. 미정의 작업유형 / 4. 예상시간 초과
-    const isAlert = ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType);
-    if (isAlert) {
-      const isRead = log.isRead;
-      let borderColor = '#f59e0b'; // 경고 (노란색)
-      let bg = isRead ? '#2a2a2a' : '#3f1d1d';
-      
-      if (log.notiType === 'INVALID_PROJECT') {
-        borderColor = '#ef4444'; // 위험 (빨간색)
-      } else if (log.notiType === 'INVALID_TASK_TYPE') {
-        borderColor = '#f97316'; // 미정의 작업유형 (주황색)
-        if (!isRead) bg = '#431407'; // 미확인 시 주황/붉은색 어두운 배경
-      }
-      
-      const bColor = isRead ? '#555' : borderColor;
-      const opacity = isRead ? 0.5 : 1;
-
-      return (
-        <div key={log.id || index} style={{ position: 'relative', opacity, background: bg, padding: '12px', borderRadius: '6px', marginBottom: '10px', borderLeft: `4px solid ${bColor}`, transition: 'all 0.3s' }}>
-          <div style={{ fontSize: '0.8rem', color: isRead ? '#888' : '#fca5a5', marginBottom: '4px' }}>{log.receiveTime} - 🚨 {log.notiType}</div>
-          <div style={{ fontWeight: 'bold', color: isRead ? '#aaa' : '#f87171' }}>{log.title}</div>
-          <div style={{ color: isRead ? '#777' : '#fca5a5', fontSize: '0.9rem', margin: '4px 0' }}>{log.message}</div>
-          
-          {/* 미정의 작업유형 상세 가이드 표시 */}
-          {!isRead && log.notiType === 'INVALID_TASK_TYPE' && (
-            <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px', borderRadius: '6px', margin: '8px 0', borderLeft: '3px solid #f97316', fontSize: '0.8rem', lineHeight: '1.4' }}>
-              {log.parsedWorkType ? (
-                <div style={{ marginBottom: '4px', color: '#fca5a5' }}>
-                  ❌ 입력된 작업유형 <span style={{ color: '#ef4444', background: '#fee2e2', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>{log.parsedWorkType}</span>은(는) 정의되지 않은 유형입니다.
-                </div>
-              ) : (
-                <div style={{ marginBottom: '4px', color: '#f87171', fontWeight: 'bold' }}>
-                  ⚠️ 코멘트에 작업유형(예: [개발], [기획] 등)이 누락되었거나 형식 오류입니다.
-                </div>
-              )}
-              
-              {log.comment && (
-                <div style={{ color: '#94a3b8', fontStyle: 'italic', margin: '6px 0', background: 'rgba(0,0,0,0.15)', padding: '6px', borderRadius: '4px', border: '1px solid #475569', wordBreak: 'break-all' }}>
-                  &quot;{log.comment}&quot;
-                </div>
-              )}
-              
-              <div style={{ color: '#cbd5e1', marginTop: '6px', fontSize: '0.75rem' }}>
-                💡 <strong>올바른 입력 가이드:</strong> JIRA 코멘트 시작 부분에 아래 형식 중 하나를 명시해 주세요:
-                <div style={{ color: '#60a5fa', margin: '2px 0 0 10px' }}>1. [프로젝트코드] [작업유형] 작업상세내용</div>
-                <div style={{ color: '#60a5fa', margin: '2px 0 0 10px' }}>2. 프로젝트코드 / 작업유형 / 작업상세내용</div>
-              </div>
-            </div>
-          )}
-          
-          <div style={{ fontSize: '0.8rem', color: isRead ? '#666' : '#cbd5e1', marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {log.issueKey && <span>🔑 {log.issueKey}</span>}
-            {log.author && <span>👤 {log.author}</span>}
-            {log.time && <span>⏱️ {log.time}</span>}
-          </div>
-          {log.url && (
-            <a href={log.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: '8px', fontSize: '0.8rem', color: isRead ? '#555' : '#60a5fa', textDecoration: 'none' }}>
-              🔗 JIRA에서 확인하기
-            </a>
-          )}
-          
-          {/* 확인 버튼 및 상태 */}
-          {!isRead ? (
-            <button 
-              onClick={() => markAsRead(log.id)}
-              style={{ position: 'absolute', top: '12px', right: '12px', padding: '4px 10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-            >
-              알람 확인
-            </button>
-          ) : (
-            <span style={{ position: 'absolute', top: '12px', right: '12px', fontSize: '0.75rem', color: '#888' }}>
-              ✓ 확인됨
-            </span>
-          )}
-        </div>
-      )
-    }
-
-    // 기본 (이전 버전 호환용)
-    const isRead = log.isRead;
-    return (
-      <div key={log.id || index} style={{ position: 'relative', opacity: isRead ? 0.5 : 1, background: '#222', padding: '10px', borderRadius: '6px', marginBottom: '10px' }}>
-        <div style={{ fontSize: '0.8rem', color: '#888' }}>{log.receiveTime}</div>
-        <div style={{ fontWeight: 'bold', color: isRead ? '#777' : '#fff' }}>🔔 {log.title}</div>
-        <div style={{ color: isRead ? '#666' : '#ccc', fontSize: '0.9rem' }}>{log.message}</div>
-        
-        {log.notiType && !isRead && (
-          <button 
-            onClick={() => markAsRead(log.id)}
-            style={{ position: 'absolute', top: '10px', right: '10px', padding: '4px 8px', background: '#444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-          >
-            확인
-          </button>
-        )}
-      </div>
-    )
+  const markAllAsRead = () => {
+    setLogs(prev => prev.map(log => ({ ...log, isRead: true })))
   }
+
+  const clearLogs = () => {
+    setLogs([])
+    sessionStorage.removeItem('noti_logs')
+  }
+
+  // 대시보드 퀵 네비게이션
+  const navigateDashboard = (path: string) => {
+    setCurrentDashboardPath(path);
+    if (iframeRef.current) {
+      const targetBase = serverIp.replace(/\/$/, '');
+      iframeRef.current.src = `${targetBase}${path}`;
+    }
+  };
+
+  const refreshDashboard = () => {
+    if (iframeRef.current) {
+      iframeRef.current.src = iframeRef.current.src;
+    }
+  };
 
   // 통계 계산
   const alertLogs = logs.filter(log => log.notiType && log.notiType !== 'USER_WORKLOG');
   const unreadCount = alertLogs.filter(log => !log.isRead).length;
-  const readCount = alertLogs.filter(log => log.isRead).length;
 
-  // 도넛 차트 렌더링 헬퍼
   const renderDonut = (hours: number) => {
     const max = 8;
     const pct = Math.min((hours / max) * 100, 100);
     
-    // 8시간 기준 5단계 파스텔톤 색상 구분
-    let color = '#bbf7d0'; // 기본: 기준 달성 (7.5h ~ 8.5h) - 파스텔 녹색
-    
+    let color = '#bbf7d0';
     if (hours < 4) {
-      color = '#dc2626'; // 1단계: 매우 미달 (0h ~ 4h) - Vivid Red
+      color = '#dc2626';
     } else if (hours < 7.5) {
-      color = '#f97316'; // 2단계: 미달 (4h ~ 7.5h) - Vivid Orange
+      color = '#f97316';
     } else if (hours <= 8.5) {
-      color = '#16a34a'; // 3단계: 기준 (7.5h ~ 8.5h) - Vivid Green
+      color = '#16a34a';
     } else if (hours <= 10) {
-      color = '#a3e635'; // 4단계: 초과 (8.5h ~ 10h) - Lime (연두색/중간색)
+      color = '#a3e635';
     } else {
-      color = '#facc15'; // 5단계: 매우 초과 (10h 이상) - Vivid Yellow
+      color = '#facc15';
     }
     
     const conic = `conic-gradient(${color} ${pct}%, #334155 0)`;
@@ -390,201 +332,544 @@ function App() {
     )
   }
 
-  return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', height: '100vh', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', background: '#0f172a', color: '#e2e8f0' }}>
-      {/* 상단 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '5px' }}>
-            <h2 style={{ color: '#60a5fa', margin: 0 }}>🔔 JIRA 백그라운드 알림 클라이언트</h2>
-            <div style={{ 
-              fontFamily: 'monospace', 
-              background: '#0f172a', 
-              color: '#10b981', 
-              padding: '4px 10px', 
-              borderRadius: '6px', 
-              border: '2px solid #10b981',
-              boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
-              fontWeight: 'bold', 
-              fontSize: '1.1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              ⏱️ {formatTime(elapsedTime)}
-            </div>
-          </div>
-          <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>
-            웹앱 서버와 연결하여 실시간으로 알림을 수신합니다. (최소화 시 트레이 숨김)
-          </p>
+  const renderLogItem = (log: any, index: number) => {
+    if (log.msg) {
+      return (
+        <div key={log.id || index} style={{ 
+          padding: '8px 12px', 
+          borderRadius: '6px', 
+          marginBottom: '8px', 
+          fontSize: '0.85rem',
+          background: log.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : log.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : '#1e293b',
+          color: log.type === 'error' ? '#fca5a5' : log.type === 'success' ? '#6ee7b7' : '#94a3b8',
+          borderLeft: `4px solid ${log.type === 'error' ? '#ef4444' : log.type === 'success' ? '#10b981' : '#64748b'}`
+        }}>
+          {log.msg}
         </div>
-        
-        <div style={{ display: 'flex', gap: '10px', minWidth: '300px' }}>
-          <input 
-            type="text" 
-            value={serverIp} 
-            onChange={(e) => setServerIp(e.target.value)} 
-            style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: 'white' }}
-          />
-          <button 
-            onClick={isConnected ? disconnectSSE : connectSSE} 
-            style={{ padding: '8px 16px', borderRadius: '4px', background: isConnected ? '#ef4444' : '#3b82f6', color: 'white', border: 'none', cursor: 'pointer', minWidth: '100px', fontWeight: 'bold' }}
-          >
-            {isConnected ? '연결 끊기' : '서버 연결'}
-          </button>
-        </div>
-      </div>
+      )
+    }
 
-      {/* 상단: 작업자별 누적 시간 (가로 그리드) */}
-      <div style={{ background: '#1e293b', padding: '15px', borderRadius: '8px', border: '1px solid #334155', marginBottom: '15px' }}>
-        <h4 style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '0.95rem' }}>👥 작업자별 누적 시간 (Today) - 클릭 시 상세 보기</h4>
-        {Object.keys(userStats).length > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
-            {Object.entries(userStats).map(([name, hours]) => {
-              // 해당 작업자의 미확인 위반 알림이 있는지 확인
-              const hasUnreadAlert = logs.some(log => 
-                !log.isRead && 
-                ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType) &&
-                (log.author === name || log.author?.includes(name))
-              );
+    if (log.notiType) {
+      const isRead = log.isRead;
+      let cardBg = '#1e293b';
+      let borderLeft = '#3b82f6';
+      let icon = '🔔';
 
-              return (
-                <div 
-                  key={name} 
-                  onClick={() => setSelectedUser(name)}
-                  style={{ 
-                    background: selectedUser === name ? '#334155' : '#0f172a', 
-                    padding: '8px', 
-                    borderRadius: '6px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '10px', 
-                    border: selectedUser === name ? '2px solid #3b82f6' : '1px solid #334155',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    position: 'relative'
-                  }}
-                >
-                  {hasUnreadAlert && (
-                    <span style={{ 
-                      position: 'absolute', 
-                      top: '-5px', 
-                      right: '-5px', 
-                      background: '#ef4444', 
-                      color: 'white', 
-                      borderRadius: '50%', 
-                      width: '18px', 
-                      height: '18px', 
-                      fontSize: '0.7rem', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      fontWeight: 'bold',
-                      boxShadow: '0 0 5px rgba(239, 68, 68, 0.5)'
-                    }}>
-                      !
-                    </span>
-                  )}
-                  {renderDonut(hours)}
-                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#cbd5e1' }}>{name}</div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={{ color: '#555', fontSize: '0.9rem' }}>
-            {isConnected ? '작업자 정보 없음' : '서버 연결 후 대기 중입니다...'}
-          </div>
-        )}
-      </div>
+      if (log.notiType === 'INVALID_PROJECT') {
+        cardBg = isRead ? 'rgba(51, 65, 85, 0.4)' : 'rgba(239, 68, 68, 0.15)';
+        borderLeft = '#ef4444';
+        icon = '🚨';
+      } else if (log.notiType === 'INVALID_TASK_TYPE') {
+        cardBg = isRead ? 'rgba(51, 65, 85, 0.4)' : 'rgba(245, 158, 11, 0.15)';
+        borderLeft = '#f59e0b';
+        icon = '⚠️';
+      } else if (log.notiType === 'TIME_EXCEEDED') {
+        cardBg = isRead ? 'rgba(51, 65, 85, 0.4)' : 'rgba(236, 72, 153, 0.15)';
+        borderLeft = '#ec4899';
+        icon = '⏱️';
+      }
 
-      {/* 하단: 좌(실시간 로그) / 우(작업 내용 상세) */}
-      <div style={{ display: 'flex', flex: 1, gap: '0px', overflow: 'hidden' }}>
-        
-        {/* 하단 좌측: 실시간 위반 알림 로그 */}
-        <div style={{ flex: `0 0 ${leftWidth}%`, background: '#1e293b', padding: '15px', borderRadius: '8px 0 0 8px', border: '1px solid #334155', borderRight: 'none', display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>
-            <h4 style={{ margin: 0, color: '#aaa', fontSize: '0.95rem' }}>
-              🚨 실시간 위반 알림 로그
-              <span style={{ fontSize: '0.8rem', marginLeft: '10px', color: '#888', fontWeight: 'normal' }}>
-                (미확인: <span style={{ color: unreadCount > 0 ? '#f87171' : '#888', fontWeight: 'bold' }}>{unreadCount}</span> / 확인: {readCount})
-              </span>
-            </h4>
-            <button 
-              onClick={() => setLogs(prev => prev.filter(log => !log.isRead))}
-              style={{ padding: '4px 10px', background: '#334155', color: '#ccc', border: '1px solid #475569', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
-              title="확인된 알림만 지웁니다."
-            >
-              🧹 비우기
-            </button>
-          </div>
-          
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {logs.length === 0 && <p style={{ color: '#555', textAlign: 'center', marginTop: '30px', fontSize: '0.9rem' }}>현재 기록된 알림 로그가 없습니다.</p>}
-            {logs.map((log, index) => renderLogCard(log, index))}
-          </div>
-        </div>
-
-        {/* 구분선 (드래그 핸들) */}
-        <div 
-          onMouseDown={handleMouseDown}
-          style={{ 
-            width: '6px', 
-            cursor: 'col-resize', 
-            background: '#334155', 
-            alignSelf: 'stretch',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }} 
-        >
-          <div style={{ width: '2px', height: '20px', background: '#475569', borderRadius: '1px' }}></div>
-        </div>
-
-        {/* 하단 우측: 작업 내용 상세 */}
-        <div style={{ flex: '1 1 auto', background: '#1e293b', padding: '15px', borderRadius: '0 8px 8px 0', border: '1px solid #334155', borderLeft: 'none', display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
-          <div style={{ marginBottom: '10px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>
-            <h4 style={{ margin: 0, color: '#aaa', fontSize: '0.95rem' }}>
-              📝 작업 기록 상세 {selectedUser ? `(${selectedUser})` : ''}
-            </h4>
-          </div>
-          
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {!selectedUser ? (
-              <p style={{ color: '#555', textAlign: 'center', marginTop: '30px', fontSize: '0.9rem' }}>상단의 작업자를 선택하면 오늘 작성한 작업 기록 목록을 볼 수 있습니다.</p>
-            ) : (userDetails[selectedUser] || []).length === 0 ? (
-              <p style={{ color: '#555', textAlign: 'center', marginTop: '30px', fontSize: '0.9rem' }}>오늘 기록된 작업 내용이 없습니다.</p>
+      return (
+        <div key={log.id || index} style={{ 
+          position: 'relative', 
+          background: cardBg, 
+          border: '1px solid #334155', 
+          borderLeft: `5px solid ${borderLeft}`, 
+          borderRadius: '8px', 
+          padding: '12px', 
+          marginBottom: '10px',
+          boxShadow: isRead ? 'none' : '0 2px 8px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{log.receiveTime}</span>
+            {!isRead ? (
+              <button 
+                onClick={() => markAsRead(log.id)}
+                style={{ padding: '3px 8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+              >
+                확인
+              </button>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {(userDetails[selectedUser] || []).map((detail, idx) => (
-                  <div key={idx} style={{ background: '#0f172a', padding: '10px', borderRadius: '6px', border: '1px solid #334155' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span style={{ color: '#60a5fa', fontWeight: 'bold', fontSize: '0.85rem' }}>{detail.issueKey}</span>
-                      <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '0.85rem' }}>{detail.hours}h</span>
-                    </div>
-                    {/* 이슈 제목 추가 */}
-                    {detail.summary && (
-                      <div style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '5px', background: '#1e293b', padding: '4px 6px', borderRadius: '4px' }}>
-                        📌 {detail.summary}
-                      </div>
-                    )}
-                    {/* 작업 내용 (댓글) */}
-                    {detail.comment && (
-                      <div style={{ color: '#cbd5e1', fontSize: '0.85rem', wordBreak: 'break-all', paddingLeft: '4px', whiteSpace: 'pre-wrap' }}>
-                        💬 {detail.comment}
-                      </div>
-                    )}
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '5px', textAlign: 'right' }}>
-                      {detail.time ? new Date(detail.time).toLocaleTimeString() : ''}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>✓ 확인됨</span>
             )}
           </div>
+          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', color: isRead ? '#94a3b8' : '#f8fafc', marginBottom: '6px' }}>
+            {icon} {log.title}
+          </div>
+          <div style={{ fontSize: '0.85rem', color: isRead ? '#64748b' : '#cbd5e1', lineHeight: '1.4' }}>
+            {log.message}
+          </div>
+          {log.comment && (
+            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', fontSize: '0.8rem', color: '#94a3b8' }}>
+              <strong>기록 내용:</strong> {log.comment}
+            </div>
+          )}
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '8px', display: 'flex', gap: '12px' }}>
+            {log.issueKey && <span>🔑 {log.issueKey}</span>}
+            {log.author && <span>👤 {log.author}</span>}
+          </div>
+          {log.url && (
+            <a href={log.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.8rem', color: '#60a5fa', textDecoration: 'none' }}>
+              🔗 JIRA에서 확인하기
+            </a>
+          )}
+        </div>
+      )
+    }
+
+    return null;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', background: '#0b0f19', color: '#f1f5f9', fontFamily: 'system-ui, -apple-system, sans-serif', overflow: 'hidden' }}>
+      
+      {/* ── 최상단 헤더 네비게이션 바 ── */}
+      <header style={{ 
+        height: '52px', 
+        background: '#111827', 
+        borderBottom: '1px solid #1f2937', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        padding: '0 16px',
+        flexShrink: 0
+      }}>
+        {/* 좌측 로고 및 타이틀 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1.25rem' }}>🚀</span>
+            <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#60a5fa', letterSpacing: '-0.3px' }}>
+              Jira Worklog Studio
+            </span>
+          </div>
+          <span style={{ 
+            fontSize: '0.72rem', 
+            padding: '2px 8px', 
+            borderRadius: '9999px', 
+            background: isConnected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            color: isConnected ? '#34d399' : '#f87171',
+            border: `1px solid ${isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isConnected ? '#10b981' : '#ef4444' }}></span>
+            {isConnected ? '보안 통신 활성' : '연결 끊김'}
+          </span>
         </div>
 
-      </div>
+        {/* 중앙 메인 탭 */}
+        <div style={{ display: 'flex', gap: '4px', background: '#0b0f19', padding: '3px', borderRadius: '8px', border: '1px solid #1f2937' }}>
+          <button 
+            onClick={() => setViewMode('dashboard')}
+            style={{ 
+              padding: '6px 14px', 
+              borderRadius: '6px', 
+              border: 'none', 
+              cursor: 'pointer', 
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: viewMode === 'dashboard' ? '#2563eb' : 'transparent',
+              color: viewMode === 'dashboard' ? '#ffffff' : '#94a3b8',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>📊</span> 업무 대시보드
+          </button>
+
+          <button 
+            onClick={() => setViewMode('monitor')}
+            style={{ 
+              padding: '6px 14px', 
+              borderRadius: '6px', 
+              border: 'none', 
+              cursor: 'pointer', 
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: viewMode === 'monitor' ? '#2563eb' : 'transparent',
+              color: viewMode === 'monitor' ? '#ffffff' : '#94a3b8',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>🔔</span> 실시간 모니터링
+            {unreadCount > 0 && (
+              <span style={{ 
+                background: '#ef4444', 
+                color: 'white', 
+                borderRadius: '9999px', 
+                padding: '1px 6px', 
+                fontSize: '0.7rem', 
+                fontWeight: 800 
+              }}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          <button 
+            onClick={() => setViewMode('tunnel')}
+            style={{ 
+              padding: '6px 14px', 
+              borderRadius: '6px', 
+              border: 'none', 
+              cursor: 'pointer', 
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: viewMode === 'tunnel' ? '#2563eb' : 'transparent',
+              color: viewMode === 'tunnel' ? '#ffffff' : '#94a3b8',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>🛡️</span> 보안 터널 & 설정
+          </button>
+        </div>
+
+        {/* 우측 유틸리티 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ 
+            fontFamily: 'monospace', 
+            background: 'rgba(16, 185, 129, 0.1)', 
+            color: '#34d399', 
+            padding: '3px 8px', 
+            borderRadius: '4px', 
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            fontWeight: 600, 
+            fontSize: '0.85rem'
+          }}>
+            ⏱️ {formatTime(elapsedTime)}
+          </div>
+
+          <button
+            onClick={toggleAlwaysOnTop}
+            title="창 항상 위에 고정 토글"
+            style={{
+              padding: '5px 10px',
+              background: isAlwaysOnTop ? '#3b82f6' : '#1f2937',
+              color: isAlwaysOnTop ? '#fff' : '#94a3b8',
+              border: '1px solid #374151',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 600
+            }}
+          >
+            📌 {isAlwaysOnTop ? '고정됨' : '고정'}
+          </button>
+        </div>
+      </header>
+
+      {/* ── 메인 컨텐츠 영역 ── */}
+      <main style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+
+        {/* 1. [업무 대시보드 뷰] */}
+        {viewMode === 'dashboard' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+            {/* 대시보드 서브 네비게이션 툴바 */}
+            <div style={{ 
+              height: '42px', 
+              background: '#0f172a', 
+              borderBottom: '1px solid #1e293b', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '0 12px' 
+            }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', marginRight: '6px', fontWeight: 600 }}>바로가기:</span>
+                {[
+                  { label: '🏠 홈 대시보드', path: '/' },
+                  { label: '📈 프로젝트 입체 모니터링', path: '/project-monitoring' },
+                  { label: '⏱️ 워크로그 분석기', path: '/worklog' },
+                  { label: '📑 월간 리포트', path: '/monthly-reports' },
+                  { label: '👥 팀원 관리', path: '/user-management' },
+                  { label: '⚙️ 기준 관리', path: '/standard-management' },
+                ].map(item => (
+                  <button
+                    key={item.path}
+                    onClick={() => navigateDashboard(item.path)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: currentDashboardPath === item.path ? '1px solid #3b82f6' : '1px solid #334155',
+                      background: currentDashboardPath === item.path ? 'rgba(59, 130, 246, 0.2)' : '#1e293b',
+                      color: currentDashboardPath === item.path ? '#60a5fa' : '#cbd5e1',
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={refreshDashboard}
+                  title="새로고침"
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    border: '1px solid #334155',
+                    background: '#1e293b',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    fontSize: '0.78rem'
+                  }}
+                >
+                  🔄 화면 새로고침
+                </button>
+              </div>
+            </div>
+
+            {/* 웹앱 임베드 iframe */}
+            <iframe
+              ref={iframeRef}
+              src={`${serverIp.replace(/\/$/, '')}${currentDashboardPath}`}
+              style={{
+                flex: 1,
+                width: '100%',
+                border: 'none',
+                background: '#0b0f19'
+              }}
+              title="Jira Analytics Dashboard"
+            />
+          </div>
+        )}
+
+        {/* 2. [실시간 모니터링 뷰] */}
+        {viewMode === 'monitor' && (
+          <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
+            {/* 좌측: 작업자별 누적 현황 도넛 차트 */}
+            <div style={{ 
+              width: `${leftWidth}%`, 
+              height: '100%', 
+              background: '#0f172a', 
+              padding: '16px', 
+              boxSizing: 'border-box', 
+              overflowY: 'auto',
+              borderRight: '1px solid #1e293b'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>👥</span> 팀원별 당일 작업시간 현황
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>카드 클릭 시 상세 워크로그 조회</span>
+              </div>
+
+              {Object.keys(userStats).length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))', gap: '12px' }}>
+                  {Object.entries(userStats).map(([name, hours]) => {
+                    const hasUnreadAlert = logs.some(log => 
+                      !log.isRead && 
+                      ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType) &&
+                      (log.author === name || log.author?.includes(name))
+                    );
+
+                    return (
+                      <div 
+                        key={name} 
+                        onClick={() => setSelectedUser(name)}
+                        style={{ 
+                          background: selectedUser === name ? '#1e293b' : '#111827', 
+                          border: selectedUser === name ? '2px solid #3b82f6' : hasUnreadAlert ? '1px solid #ef4444' : '1px solid #1f2937', 
+                          borderRadius: '8px', 
+                          padding: '12px', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          position: 'relative'
+                        }}
+                      >
+                        {hasUnreadAlert && (
+                          <span style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></span>
+                        )}
+                        {renderDonut(hours)}
+                        <span style={{ marginTop: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc', textAlign: 'center' }}>
+                          {name}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: '#64748b', padding: '40px 0', fontSize: '0.9rem' }}>
+                  작업시간 통계 수신 대기 중...
+                </div>
+              )}
+
+              {/* 선택된 작업자 상세 모달/패널 */}
+              {selectedUser && (
+                <div style={{ marginTop: '20px', background: '#111827', border: '1px solid #1f2937', borderRadius: '8px', padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.95rem' }}>
+                      📋 {selectedUser} 님의 오늘 작업 내역
+                    </h4>
+                    <button 
+                      onClick={() => setSelectedUser(null)}
+                      style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
+                    >
+                      ✕ 닫기
+                    </button>
+                  </div>
+                  
+                  {userDetails[selectedUser] && userDetails[selectedUser].length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+                      {userDetails[selectedUser].map((item, idx) => (
+                        <div key={idx} style={{ background: '#1e293b', padding: '10px', borderRadius: '6px', fontSize: '0.85rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
+                            <span>🔑 {item.issueKey}</span>
+                            <span style={{ color: '#34d399' }}>{item.hours}h</span>
+                          </div>
+                          {item.summary && <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '4px' }}>{item.summary}</div>}
+                          {item.comment && <div style={{ color: '#cbd5e1', fontSize: '0.78rem' }}>💬 {item.comment}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#64748b', fontSize: '0.85rem' }}>기록된 상세 작업 내역이 없습니다.</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 스플릿 리사이저 바 */}
+            <div 
+              onMouseDown={handleMouseDown} 
+              style={{ width: '6px', background: '#1e293b', cursor: 'col-resize', transition: 'background 0.2s' }}
+            />
+
+            {/* 우측: 실시간 알림 로그 목록 */}
+            <div style={{ 
+              flex: 1, 
+              height: '100%', 
+              background: '#0b0f19', 
+              padding: '16px', 
+              boxSizing: 'border-box', 
+              display: 'flex', 
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc' }}>🔔 알림 및 모니터링 로그</h3>
+                  {unreadCount > 0 && (
+                    <span style={{ background: '#ef4444', color: 'white', borderRadius: '9999px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }}>
+                      미확인 {unreadCount}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={markAllAsRead}
+                    style={{ padding: '4px 10px', background: '#1e293b', color: '#94a3b8', border: '1px solid #334155', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                  >
+                    모두 확인
+                  </button>
+                  <button 
+                    onClick={clearLogs}
+                    style={{ padding: '4px 10px', background: '#1e293b', color: '#94a3b8', border: '1px solid #334155', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                  >
+                    로그 비우기
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {logs.length > 0 ? (
+                  logs.map((log, idx) => renderLogItem(log, idx))
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#475569', padding: '40px 0', fontSize: '0.9rem' }}>
+                    수신된 알림 로그가 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. [보안 터널 & 설정 뷰] */}
+        {viewMode === 'tunnel' && (
+          <div style={{ height: '100%', width: '100%', overflowY: 'auto', padding: '32px', boxSizing: 'border-box', background: '#0b0f19' }}>
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              
+              <h2 style={{ color: '#60a5fa', margin: '0 0 8px 0', fontSize: '1.4rem' }}>
+                🛡️ SSH 보안 터널 및 백엔드 연결 설정
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '24px', lineHeight: 1.5 }}>
+                사내 웹서버 보안 점검에 걸리지 않도록, 우분투 PC의 웹서버는 외부 포트를 열지 않고 <code style={{ color: '#38bdf8' }}>127.0.0.1:3000</code>에만 바인딩되어 있습니다.
+                윈도우 PC에서 SSH 암호화 터널을 연결하면 안전하게 데이터를 중계받을 수 있습니다.
+              </p>
+
+              {/* 연결 주소 설정 박스 */}
+              <div style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
+                <h4 style={{ margin: '0 0 12px 0', color: '#f8fafc', fontSize: '0.95rem' }}>
+                  🌐 백엔드 연결 주소
+                </h4>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input 
+                    type="text" 
+                    value={serverIp} 
+                    onChange={(e) => setServerIp(e.target.value)} 
+                    placeholder="예: http://localhost:3000 (SSH 터널 사용 시) 또는 http://192.168.105.10:3000"
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: '6px', border: '1px solid #374151', background: '#0f172a', color: 'white', fontSize: '0.9rem' }}
+                  />
+                  <button 
+                    onClick={isConnected ? disconnectSSE : connectSSE} 
+                    style={{ 
+                      padding: '10px 20px', 
+                      borderRadius: '6px', 
+                      background: isConnected ? '#ef4444' : '#2563eb', 
+                      color: 'white', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      fontWeight: 600,
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {isConnecting ? '연결 중...' : isConnected ? '연결 끊기' : '연결 테스트'}
+                  </button>
+                </div>
+                <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b' }}>
+                  💡 SSH 터널을 맺은 경우 <strong style={{ color: '#93c5fd' }}>http://localhost:3000</strong> 을 입력하세요.
+                </div>
+              </div>
+
+              {/* SSH 터널 원클릭 가이드 */}
+              <div style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: '8px', padding: '20px' }}>
+                <h4 style={{ margin: '0 0 12px 0', color: '#f8fafc', fontSize: '0.95rem' }}>
+                  ⚡ 윈도우 SSH 터널 연결 가이드
+                </h4>
+                <p style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '14px' }}>
+                  우분투 PC의 SSH 포트(22)를 통해 로컬 터널을 열어두면, 윈도우 PC의 <code style={{ color: '#38bdf8' }}>localhost:3000</code>이 우분투의 내부 서버와 직접 암호화 통신합니다:
+                </p>
+
+                <div style={{ background: '#0f172a', padding: '12px 16px', borderRadius: '6px', border: '1px solid #1e293b', fontFamily: 'monospace', fontSize: '0.85rem', color: '#34d399', marginBottom: '14px' }}>
+                  ssh -N -L 3000:127.0.0.1:3000 [우분투_사용자명]@[우분투_IP]
+                </div>
+
+                <div style={{ color: '#94a3b8', fontSize: '0.85rem', lineHeight: 1.6 }}>
+                  <strong>팁:</strong> 프로젝트 폴더 내에 포함된 <code style={{ color: '#60a5fa' }}>start-tunnel.bat</code> 파일을 실행하시면 터널 연결과 앱 실행을 클릭 한 번으로 완료하실 수 있습니다.
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+      </main>
+
     </div>
   )
 }

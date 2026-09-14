@@ -12,12 +12,14 @@
   "app": {
     "windows": [
       {
-        "title": "Jira Notifications",
-        "width": 800,
-        "height": 600,
+        "title": "Jira Worklog Studio",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 720,
         "resizable": true,
         "fullscreen": false,
-        "alwaysOnTop": true
+        "alwaysOnTop": false
       }
     ],
     "security": {
