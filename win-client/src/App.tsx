@@ -22,7 +22,7 @@ function App() {
   const [userDetails, setUserDetails] = useState<Record<string, any[]>>({})
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
   const [serverIp, setServerIp] = useState(() => {
-    return localStorage.getItem('jira_server_url') || 'http://192.168.105.10:3000';
+    return localStorage.getItem('jira_server_url') || 'http://localhost:3000';
   })
   const [isConnected, setIsConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
