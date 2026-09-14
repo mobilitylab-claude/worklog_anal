@@ -128,7 +128,14 @@ function App() {
   }
 
   const connectSSE = () => {
-    if (isConnected || isConnecting) return;
+    if (isConnecting) return;
+    
+    // 기존 연결이 있다면 명시적으로 종료 후 재연결
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+
     setIsConnecting(true);
     
     const targetUrl = serverIp.replace(/\/$/, '');
@@ -144,89 +151,99 @@ function App() {
       };
 
       eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        const baseLog = { id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false };
-        
-        if (data.type === 'connected') {
-          setLogs(prev => [{ ...baseLog, type: 'success', msg: `[${baseLog.receiveTime}] ✅ 백엔드 연결 완료: ${data.message}` }, ...prev])
-          setIsConnected(true)
-          setIsConnecting(false)
+        try {
+          const data = JSON.parse(event.data)
+          const baseLog = { id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false };
+          
+          if (data.type === 'connected') {
+            setLogs(prev => [{ ...baseLog, type: 'success', msg: `[${baseLog.receiveTime}] ✅ 백엔드 연결 완료: ${data.message}` }, ...prev])
+            setIsConnected(true)
+            setIsConnecting(false)
 
-          fetch(`${targetUrl}/api/notifications/initial-stats`)
-            .then(res => res.json())
-            .then(resData => {
-              if (resData.success) {
-                if (resData.stats) setUserStats(resData.stats)
-                if (resData.details) setUserDetails(resData.details)
-                
-                if (resData.loadingLogs) {
-                  const logsToAdd = resData.loadingLogs.map((msg: string, idx: number) => ({
-                    id: `load-${Date.now()}-${idx}`,
-                    receiveTime: new Date().toLocaleTimeString(),
-                    isRead: true,
-                    type: 'info',
-                    title: '초기 로딩 단계',
-                    message: msg
-                  }));
-                  setLogs(prev => [...logsToAdd.reverse(), ...prev]);
+            fetch(`${targetUrl}/api/notifications/initial-stats`)
+              .then(res => res.json())
+              .then(resData => {
+                if (resData.success) {
+                  if (resData.stats) setUserStats(resData.stats)
+                  if (resData.details) setUserDetails(resData.details)
+                  
+                  if (resData.loadingLogs) {
+                    const logsToAdd = resData.loadingLogs.map((msg: string, idx: number) => ({
+                      id: `load-${Date.now()}-${idx}`,
+                      receiveTime: new Date().toLocaleTimeString(),
+                      isRead: true,
+                      type: 'info',
+                      title: '초기 로딩 단계',
+                      message: msg
+                    }));
+                    setLogs(prev => [...logsToAdd.reverse(), ...prev]);
+                  }
+                }
+              })
+              .catch(err => {
+                console.error("초기 통계 데이터 로드 실패:", err);
+              })
+          } else {
+            if (data.notiType === 'USER_WORKLOG') {
+              setUserStats(prev => ({
+                ...prev,
+                [data.title]: parseFloat(data.accumulatedHours || "0")
+              }))
+              
+              if (data.message) {
+                const match = data.message.match(/\[(.*?)\] (.*?)h 작업기록 등록/);
+                if (match) {
+                  const issueKey = match[1];
+                  const hours = parseFloat(match[2]);
+                  setUserDetails(prev => {
+                    const userLogs = prev[data.title] || [];
+                    const isDuplicate = userLogs.some((l: any) => l.issueKey === issueKey && l.hours === hours);
+                    if (isDuplicate) return prev;
+                    return {
+                      ...prev,
+                      [data.title]: [
+                        ...userLogs,
+                        { issueKey, hours, comment: '실시간 등록됨', time: new Date().toISOString() }
+                      ]
+                    };
+                  });
                 }
               }
-            })
-            .catch(err => {
-              console.error("초기 통계 데이터 로드 실패:", err);
-            })
-        } else {
-          if (data.notiType === 'USER_WORKLOG') {
-            setUserStats(prev => ({
-              ...prev,
-              [data.title]: parseFloat(data.accumulatedHours || "0")
-            }))
-            
-            if (data.message) {
-              const match = data.message.match(/\[(.*?)\] (.*?)h 작업기록 등록/);
-              if (match) {
-                const issueKey = match[1];
-                const hours = parseFloat(match[2]);
-                setUserDetails(prev => {
-                  const userLogs = prev[data.title] || [];
-                  const isDuplicate = userLogs.some((l: any) => l.issueKey === issueKey && l.hours === hours);
-                  if (isDuplicate) return prev;
-                  return {
-                    ...prev,
-                    [data.title]: [
-                      ...userLogs,
-                      { issueKey, hours, comment: '실시간 등록됨', time: new Date().toISOString() }
-                    ]
-                  };
+            } else if (data.notiType === 'ALL_USER_STATS') {
+              if (data.stats) {
+                setUserStats(prev => {
+                  const isChanged = Object.keys(data.stats).some(k => data.stats[k] !== prev[k]);
+                  if (isChanged) return data.stats;
+                  return prev;
                 });
               }
+              if (data.details) {
+                setUserDetails(data.details);
+              }
+            } else {
+              playSound()
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(data.title || "JIRA 알림", { body: data.message })
+              }
+              showMainWindow()
+              setLogs(prev => [{ ...data, ...baseLog }, ...prev])
             }
-          } else if (data.notiType === 'ALL_USER_STATS') {
-            if (data.stats) {
-              setUserStats(prev => {
-                const isChanged = Object.keys(data.stats).some(k => data.stats[k] !== prev[k]);
-                if (isChanged) return data.stats;
-                return prev;
-              });
-            }
-            if (data.details) {
-              setUserDetails(data.details);
-            }
-          } else {
-            playSound()
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification(data.title || "JIRA 알림", { body: data.message })
-            }
-            showMainWindow()
-            setLogs(prev => [{ ...data, ...baseLog }, ...prev])
           }
+        } catch (parseErr) {
+          // ping 또는 주석 메시지는 무시
         }
       }
 
       eventSource.onerror = () => {
-        setIsConnected(false);
         setIsConnecting(false);
-        setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'error', msg: `[${new Date().toLocaleTimeString()}] ❌ SSE 연결 끊김/재시도 중...` }, ...prev])
+        // 만약 완전히 닫힌 경우에만 끊김 로그 추가
+        if (eventSource.readyState === EventSource.CLOSED) {
+          setIsConnected(false);
+          setLogs(prev => [{ id: Date.now() + Math.random(), receiveTime: new Date().toLocaleTimeString(), isRead: false, type: 'error', msg: `[${new Date().toLocaleTimeString()}] ❌ SSE 연결 끊김 (서버 닫힘)` }, ...prev])
+        } else if (eventSource.readyState === EventSource.CONNECTING) {
+          // 브라우저 자동 재연결 시도 중
+          setIsConnected(false);
+        }
       }
     } catch (err: any) {
       setIsConnected(false);
