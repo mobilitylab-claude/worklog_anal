@@ -27,7 +27,7 @@ case "$1" in
       sleep 1
     fi
 
-    echo "🚀 로컬 전용 Next.js 백엔드 데몬 시작 중 (127.0.0.1:3000)..."
+    echo "🚀 Next.js 백엔드 데몬 시작 중 (포트 3000)..."
     nohup npm start >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     sleep 3

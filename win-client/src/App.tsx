@@ -22,7 +22,7 @@ function App() {
   const [userDetails, setUserDetails] = useState<Record<string, any[]>>({})
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
   const [serverIp, setServerIp] = useState(() => {
-    return localStorage.getItem('jira_server_url') || 'http://localhost:3000';
+    return localStorage.getItem('jira_server_url') || 'http://192.168.105.10:3000';
   })
   const [isConnected, setIsConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
@@ -529,7 +529,7 @@ function App() {
               transition: 'all 0.15s ease'
             }}
           >
-            <span>🛡️</span> 보안 터널 & 설정
+            <span>⚙️</span> 서버 설정
           </button>
         </div>
 
@@ -612,10 +612,32 @@ function App() {
                 ))}
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  value={serverIp} 
+                  onChange={(e) => setServerIp(e.target.value)} 
+                  style={{ width: '210px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #334155', background: '#1e293b', color: '#cbd5e1', fontSize: '0.78rem' }}
+                  title="서버 접속 주소"
+                />
+                <button
+                  onClick={isConnected ? disconnectSSE : connectSSE}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: isConnected ? '#ef4444' : '#2563eb',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: 600
+                  }}
+                >
+                  {isConnecting ? '연결 중...' : isConnected ? '연결 해제' : '서버 연결'}
+                </button>
                 <button
                   onClick={refreshDashboard}
-                  title="새로고침"
+                  title="화면 새로고침"
                   style={{
                     padding: '4px 10px',
                     borderRadius: '4px',
@@ -626,7 +648,7 @@ function App() {
                     fontSize: '0.78rem'
                   }}
                 >
-                  🔄 화면 새로고침
+                  🔄
                 </button>
               </div>
             </div>
