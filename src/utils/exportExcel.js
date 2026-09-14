@@ -50,5 +50,49 @@ export async function exportIssuesToExcel(issues, filename = "my_assigned_issues
   const worksheet = xlsx.utils.json_to_sheet(exportData);
   const workbook = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(workbook, worksheet, "Issues");
-  xlsx.writeFile(workbook, filename);
+  saveWorkbook(xlsx, workbook, filename);
 }
+
+/**
+ * 웹 및 데스크톱(Tauri iframe) 환경을 모두 지원하는 범용 엑셀 저장 함수
+ */
+export function saveWorkbook(xlsx, workbook, filename) {
+  try {
+    const wbout = xlsx.write(workbook, { bookType: "xlsx", type: "array" });
+    const u8arr = new Uint8Array(wbout);
+
+    // 1. 데스크톱 앱(Tauri iframe 임베드) 환경: 부모 창으로 데이터 전달하여 네이티브 파일 저장
+    if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        {
+          type: "TAURI_DOWNLOAD_EXCEL",
+          filename: filename,
+          data: Array.from(u8arr)
+        },
+        "*"
+      );
+      return;
+    }
+
+    // 2. 일반 웹 브라우저 환경: Blob 다운로드 수행
+    const blob = new Blob([u8arr], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    if (typeof window !== "undefined" && window.navigator && window.navigator.msSaveOrOpenBlob) {
+      window.navigator.msSaveOrOpenBlob(blob, filename);
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+  } catch (err) {
+    console.error("saveWorkbook 오류, fallback 시도:", err);
+    xlsx.writeFile(workbook, filename);
+  }
+}
+

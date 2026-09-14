@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
+import { saveWorkbook } from "@/utils/exportExcel";
 
 export default function MonthlyReportsArchive() {
   const [reports, setReports] = useState([]);
@@ -93,7 +94,7 @@ export default function MonthlyReportsArchive() {
       }));
 
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detail), "작업상세");
-      XLSX.writeFile(wb, `Monthly_Report_${report.project_code}_${report.report_month}.xlsx`);
+      saveWorkbook(XLSX, wb, `Monthly_Report_${report.project_code}_${report.report_month}.xlsx`);
     } catch (e) {
       alert("엑셀 저장 실패: " + e.message);
     }

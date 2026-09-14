@@ -31,10 +31,48 @@ function App() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const [elapsedTime, setElapsedTime] = useState(0)
 
+  // ── 엑셀 다운로드 완료 토스트 알림 상태 ──
+  const [downloadToast, setDownloadToast] = useState<{ show: boolean; filename: string; fullPath: string } | null>(null);
+
   // 서버 URL 저장
   useEffect(() => {
     localStorage.setItem('jira_server_url', serverIp);
   }, [serverIp]);
+
+  // ── 대시보드(iframe) 엑셀 다운로드 요청 수신 및 저장 ──
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'TAURI_DOWNLOAD_EXCEL') {
+        const { filename, data } = event.data;
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const fullPath = await invoke<string>('save_excel_file', {
+            filename,
+            data
+          });
+          setDownloadToast({ show: true, filename, fullPath });
+          setLogs(prev => [{
+            id: Date.now() + Math.random(),
+            receiveTime: new Date().toLocaleTimeString(),
+            isRead: false,
+            type: 'info',
+            msg: `[${new Date().toLocaleTimeString()}] 📥 엑셀 파일 저장 완료: ${filename}`
+          }, ...prev]);
+
+          // 6초 후 토스트 자동 닫기
+          setTimeout(() => {
+            setDownloadToast(prev => (prev?.fullPath === fullPath ? null : prev));
+          }, 6000);
+        } catch (err: any) {
+          console.error("엑셀 파일 저장 실패:", err);
+          alert(`엑셀 파일 저장 실패: ${err?.message || err}`);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // 창 항상 위 고정 토글
   const toggleAlwaysOnTop = async () => {
@@ -680,6 +718,7 @@ function App() {
                 border: 'none',
                 background: '#0b0f19'
               }}
+              sandbox="allow-scripts allow-same-origin allow-downloads allow-forms allow-popups allow-modals"
               title="Jira Analytics Dashboard"
             />
           </div>
@@ -908,6 +947,70 @@ function App() {
         )}
 
       </main>
+
+      {/* ── 엑셀 다운로드 완료 플로팅 알림 (Toast) ── */}
+      {downloadToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: '#1e293b',
+          border: '1px solid #10b981',
+          borderRadius: '10px',
+          padding: '14px 18px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          zIndex: 99999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          maxWidth: '420px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              📥 엑셀 다운로드 완료
+            </span>
+            <button
+              onClick={() => setDownloadToast(null)}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', padding: '0 4px' }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ fontSize: '0.82rem', color: '#f1f5f9', fontWeight: '600', wordBreak: 'break-all' }}>
+            {downloadToast.filename}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#94a3b8', wordBreak: 'break-all', fontFamily: 'monospace', background: '#0f172a', padding: '4px 6px', borderRadius: '4px' }}>
+            {downloadToast.fullPath}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+            <button
+              onClick={async () => {
+                try {
+                  const { invoke } = await import('@tauri-apps/api/core');
+                  await invoke('open_file_in_folder', { path: downloadToast.fullPath });
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              style={{
+                background: '#059669',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              📂 저장 폴더 열기
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   )

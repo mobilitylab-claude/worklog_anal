@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { getJiraAuthHeaders } from "@/lib/jiraAuthClient";
+import { saveWorkbook } from "@/utils/exportExcel";
 
 const AVAILABLE_COLUMNS = [
   { id: "started",     label: "작업 일시",      width: "11%" },
@@ -365,7 +366,7 @@ export default function ProjectMonitoring() {
       xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(monthStats), "월별 추이");
       xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(issueTypeStats), "이슈유형별 통계");
 
-      xlsx.writeFile(wb, `Project_Monitoring_${projectCode || "Export"}.xlsx`);
+      saveWorkbook(xlsx, wb, `Project_Monitoring_${projectCode || "Export"}.xlsx`);
     } catch (e) {
       alert("엑셀 저장 실패: " + e.message);
     }

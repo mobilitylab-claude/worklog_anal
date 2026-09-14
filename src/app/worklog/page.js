@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { getJiraAuthHeaders } from "@/lib/jiraAuthClient";
+import { saveWorkbook } from "@/utils/exportExcel";
 
 const AVAILABLE_COLUMNS = [
   { id: "started", label: "작업 일시", width: "11%" },
@@ -507,7 +508,7 @@ export default function WorklogAnalyzer() {
         xlsx.utils.book_append_sheet(wb, wsUser, sheetName);
       });
 
-      xlsx.writeFile(wb, `Jira_Worklog_${startDate}_to_${endDate}.xlsx`);
+      saveWorkbook(xlsx, wb, `Jira_Worklog_${startDate}_to_${endDate}.xlsx`);
     } catch (e) {
       alert("엑셀 오류: " + e.message);
     }
