@@ -815,7 +815,7 @@ function App() {
                   </div>
                   
                   {userDetails[selectedUser] && userDetails[selectedUser].length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {userDetails[selectedUser].map((item, idx) => (
                         <div key={idx} style={{ background: '#1e293b', padding: '10px', borderRadius: '6px', fontSize: '0.85rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
