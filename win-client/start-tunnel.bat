@@ -10,14 +10,17 @@ echo   Jira Worklog Studio - ?í´ë¦??¤í–‰ ?°ì²˜
 echo ========================================================
 echo.
 
-echo [1/2] 3000ë²??¬íŠ¸ ?íƒœ ?ê? ì¤?..
-netstat -ano | findstr "127.0.0.1:3000" > nul
+echo [1/2] 3000ë²?ë¡œì»¬ ?¬íŠ¸ ?°ë„ ?íƒœ ?ê? ì¤?..
+netstat -ano | findstr "127.0.0.1:3000" | findstr "LISTENING" > nul
 if %errorlevel% equ 0 (
-    echo [?ˆë‚´] 3000ë²??¬íŠ¸ê°€ ?œì„±?”ë˜???ˆìŠµ?ˆë‹¤.
+    echo [?ˆë‚´] SSH ?°ë„(127.0.0.1:3000)???´ë? ?•ìƒ ?œì„±?”ë˜???ˆìŠµ?ˆë‹¤.
     goto run_app
 )
 
-echo [?ˆë‚´] ?°ë¶„???œë²„(%UBUNTU_IP%)ë¡?ì§ì ‘ ?°ê²°?©ë‹ˆ??
+echo [?ˆë‚´] ?°ë¶„???œë²„(%UBUNTU_IP%)ë¡œì˜ ë³´ì•ˆ SSH ?°ë„???ì„±?©ë‹ˆ??..
+echo       (??ë¸Œë¼?°ì? ?‘ê·¼ ì°¨ë‹¨ ë°??”í˜¸???µì‹  ? ì?)
+start "Jira-SSH-Tunnel" /min ssh -N -L 3000:127.0.0.1:3000 %USERNAME%@%UBUNTU_IP%
+timeout /t 2 > nul
 
 :run_app
 echo.
