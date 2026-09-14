@@ -68,11 +68,60 @@ npm run tauri dev
 
 ---
 
-## 📦 5. 배포 빌드 (실행 파일 만들기)
+## 📦 5. 배포 빌드 (단독 실행 파일 및 설치본 만들기)
 
-개발 모드가 아닌, 실제 사용할 수 있는 단일 `.exe` 실행 파일 또는 설치용 셋업 파일을 만들고 싶다면 아래 명령어를 실행합니다.
+개발 모드가 아닌, Vite 개발 서버 없이 언제든 클릭 한 번으로 실행할 수 있는 독립형 `.exe` 실행 파일이나 설치용 셋업 파일을 만들 때 사용합니다.
 
+### 5.1 단일 포터블 실행 파일(.exe) 빌드 (추천)
+설치 마법사(NSIS/MSI) 패키징 과정 없이 가볍고 빠른 단독 실행 파일만 생성하려면 `--no-bundle` 옵션을 사용합니다.
+
+```powershell
+# (D:\works\win-client 경로에서 실행)
+npm run tauri build -- --no-bundle
+```
+* **생성 위치:** `src-tauri/target/release/win-client.exe` (또는 `app.exe`)
+* 이 파일은 프론트엔드 UI(HTML/CSS/JS)가 바이너리 내부에 완전히 번들링되어 있어 **Vite 개발 서버 없이도 단독 실행**이 가능합니다.
+* **작업 표시줄 및 바탕화면 바로가기(단축 아이콘)를 만들 때는 반드시 이 릴리즈 경로의 실행 파일을 등록**해야 합니다.
+
+### 5.2 정식 설치 마법사(Installer) 빌드
 ```powershell
 npm run tauri build
 ```
-빌드가 완료되면 `src-tauri/target/release/bundle/nsis` 폴더에 설치 마법사 파일이 생성되며, 이를 통해 PC 시작 시 자동 실행되도록 윈도우에 앱을 정식으로 배포/설치할 수 있습니다.
+* 빌드가 완료되면 `src-tauri/target/release/bundle/nsis` 폴더에 설치 마법사 파일이 생성되며, 이를 통해 PC 시작 시 자동 실행되도록 윈도우에 앱을 정식으로 배포/설치할 수 있습니다.
+
+---
+
+## 🚨 6. 자주 발생하는 오류 및 트러블슈팅
+
+### ❌ 6.1 단축실행 버튼/바로가기 실행 시 "이 페이지에 연결할 수 없습니다 (ERR_CONNECTION_REFUSED)" 오류
+
+![localhost 연결 거부 에러](https://via.placeholder.com/800x400?text=ERR_CONNECTION_REFUSED)
+
+* **증상:** 작업 표시줄 또는 바탕화면 바로가기를 눌러 실행했을 때 화면에 `"이 페이지에 연결할 수 없습니다. localhost 연결을 거부했습니다. ERR_CONNECTION_REFUSED"` 창이 나타남.
+* **원인:** 바로가기(단축 아이콘)의 대상 파일이 **디버그 빌드(`src-tauri/target/debug/app.exe`)**로 연결되어 있기 때문입니다.
+  * 디버그(Debug) 모드로 컴파일된 바이너리는 실시간 코드 수정(HMR) 반영을 위해 웹뷰가 로컬 개발 서버(`http://localhost:5173`)로 접속하도록 동작합니다.
+  * 따라서 터미널에서 Vite 개발 서버(`npm run dev` 또는 `npm run tauri dev`)가 켜져 있지 않은 상태에서 `target/debug/app.exe`를 단독 실행하면 포트가 닫혀 있어 연결 거부 에러가 발생합니다.
+* **해결 방법 (2가지 중 선택):**
+  1. **해결책 A (독립 실행 - 권장):** 
+     * `5.1 단일 포터블 실행 파일 빌드`를 참고하여 `npm run tauri build -- --no-bundle` 명령어로 릴리즈 버전을 빌드합니다.
+     * 빌드 완료 후 바로가기(단축 아이콘)의 속성에서 **대상(TargetPath)**을 `D:\works\win-client\src-tauri\target\release\win-client.exe`로 교체합니다.
+  2. **해결책 B (개발 모드 구동):**
+     * 개발/수정 작업 중이라면 `.exe`를 직접 클릭하지 말고 터미널에서 아래 명령어를 실행하여 Vite 서버와 Tauri 창을 함께 띄웁니다:
+       ```powershell
+       cd D:\works\win-client
+       npm run tauri dev
+       ```
+
+### ❌ 6.2 빌드 시 Tauri 패키지 버전 불일치 오류 (`Found version mismatched Tauri packages`)
+* **증상:** `npm run tauri build` 실행 시 아래와 같은 오류와 함께 빌드 중단
+  ```
+  Found version mismatched Tauri packages. Make sure the NPM package and Rust crate versions are on the same major/minor releases:
+  tauri (v2.11.1) : @tauri-apps/api (v2.0.0)
+  ```
+* **원인:** Rust 백엔드의 `tauri` 크레이트 버전(2.11.x)과 NPM 패키지인 `@tauri-apps/api` 버전(2.0.x)의 마이너 버전이 일치하지 않을 때 Tauri CLI가 빌드를 차단합니다.
+* **해결 방법:** `package.json`에서 `@tauri-apps/api` 버전을 `^2.11.1`로 상향 지정한 후 `npm install`을 수행합니다.
+
+### ❌ 6.3 빌드 시 `bundle identifier (com.tauri.dev)` 오류
+* **증상:** `The default value com.tauri.dev is not allowed as it must be unique across applications.`
+* **원인:** 릴리즈 빌드 시 Tauri는 기본 식별자(`com.tauri.dev`) 사용을 금지합니다.
+* **해결 방법:** `src-tauri/tauri.conf.json`의 `"identifier"`를 고유한 패키지명(예: `"com.selvas.jira-notifier"`)으로 변경합니다.

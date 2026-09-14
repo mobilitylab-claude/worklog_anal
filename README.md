@@ -105,3 +105,56 @@ npm start
     3. 저장하고 빠져나옵니다.
 *   **특정 프로젝트의 스케줄만 지우고 싶은 경우**:
     시스템 소스코드나 DB를 직접 수정할 필요 없이, 추후 UI 상에 업데이트될 스케줄 관리 메뉴에서 삭제하거나, 직접 SQLite DB(`jira_filters.db`의 `scheduled_reports` 테이블)에서 해당 프로젝트의 레코드를 지워주시면 시스템이 알아서 무시하게 됩니다.
+
+---
+
+## 🔒 Nginx 리버스 프록시 및 사내망(192.168.105.x) IP 접근 제한
+
+외부 인터넷이나 타 서브넷 PC의 무단 접근을 차단하고, **오직 로컬 네트워크(`192.168.105.x`) 및 서버 로컬호스트(`127.0.0.1`)에서만 접속**할 수 있도록 Nginx 웹서버를 구성합니다.
+
+프로젝트 루트의 [`nginx.conf.example`](file:///z:/workspace/worklog_anal/nginx.conf.example) 파일을 활용하여 우분투 서버에 다음과 같이 적용합니다.
+
+### 1단계: Nginx 설치
+```bash
+sudo apt update
+sudo apt install nginx -y
+```
+
+### 2단계: Nginx 사이트 설정 등록
+```bash
+# 프로젝트의 템플릿 설정을 Nginx sites-available에 복사
+sudo cp nginx.conf.example /etc/nginx/sites-available/worklog-dashboard
+
+# 사이트 활성화 (심볼릭 링크 생성)
+sudo ln -s /etc/nginx/sites-available/worklog-dashboard /etc/nginx/sites-enabled/
+
+# 기본 default 설정 비활성화 (선택)
+sudo rm -f /etc/nginx/sites-enabled/default
+```
+
+### 3단계: IP 접근 제어 규칙 확인
+`/etc/nginx/sites-available/worklog-dashboard` 내 핵심 설정:
+```nginx
+# 로컬호스트 및 192.168.105.x 대역만 허용하고 그 외 모든 접근 차단
+allow 127.0.0.1;
+allow 192.168.105.0/24;
+deny all;
+```
+
+### 4단계: 설정 검증 및 Nginx 재시작
+```bash
+# Nginx 문법 검사
+sudo nginx -t
+
+# 성공 메시지 확인 후 Nginx 재로드
+sudo systemctl reload nginx
+```
+
+> ⚠️ **주의 (Next.js 3000번 포트 외부 차단)**: 
+> Nginx(80번 포트)를 통해서만 접근하도록 강제하려면, 리눅스 UFW 방화벽에서 3000번 포트의 외부 접근을 막고 80번 포트만 열어주세요:
+> ```bash
+> sudo ufw allow from 192.168.105.0/24 to any port 80 proto tcp
+> sudo ufw delete allow 3000/tcp # (기존에 3000번을 열어두었다면 삭제)
+> sudo ufw reload
+> ```
+

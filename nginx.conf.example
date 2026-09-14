@@ -1,0 +1,63 @@
+# /etc/nginx/sites-available/worklog-dashboard
+# 심볼릭 링크: sudo ln -s /etc/nginx/sites-available/worklog-dashboard /etc/nginx/sites-enabled/
+
+server {
+    listen 80;
+    server_name 192.168.105.10; # 리눅스 서버 IP 또는 도메인으로 변경
+
+    # ==========================================================
+    # 🔒 IP 접근 제어 (192.168.105.x 대역 및 로컬만 허용)
+    # ==========================================================
+    allow 127.0.0.1;            # 서버 로컬호스트 허용
+    allow 192.168.105.0/24;     # 192.168.105.1 ~ 192.168.105.254 대역 허용
+    deny all;                   # 그 외 모든 외부/타 네트워크 IP 차단 (403 Forbidden)
+
+    # 403 차단 시 에러 페이지 커스텀 (선택)
+    error_page 403 /custom_403.html;
+    location = /custom_403.html {
+        return 403 "Forbidden: Access is only allowed from the 192.168.105.x network.\n";
+    }
+
+    # ==========================================================
+    # 🛡️ 기본 보안 헤더
+    # ==========================================================
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # ==========================================================
+    # 🔔 SSE (Server-Sent Events) 알림 스트림 전용 설정
+    # (버퍼링을 끄지 않으면 윈도우 클라이언트로 실시간 토스트가 가지 않음)
+    # ==========================================================
+    location /api/notifications/stream {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # 실시간 스트리밍 필수 옵션
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+        proxy_read_timeout 86400s; # 긴 연결 유지 (24시간)
+    }
+
+    # ==========================================================
+    # 🌐 Next.js 웹 애플리케이션 프록시
+    # ==========================================================
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 파일 업로드(엑셀 등) 허용 용량 설정
+        client_max_body_size 20M;
+    }
+}
