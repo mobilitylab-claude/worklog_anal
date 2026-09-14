@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getWorklogs } from "@/lib/worklogService";
+import { getActiveJiraToken } from "@/lib/jiraAuthServer";
 
 export async function POST(request) {
   const debugLog = [];
@@ -8,7 +9,7 @@ export async function POST(request) {
     const body = await request.json();
     const xJiraToken = request.headers.get("x-jira-token");
     const JIRA_DOMAIN = process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
-    const JIRA_API_TOKEN = xJiraToken || process.env.JIRA_API_TOKEN;
+    const JIRA_API_TOKEN = getActiveJiraToken(xJiraToken);
 
     const cleanDomain = JIRA_DOMAIN ? JIRA_DOMAIN.replace(/\/$/, "") : "";
 

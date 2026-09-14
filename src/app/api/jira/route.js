@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { fetchJiraSearch } from "@/lib/jiraClient";
+import { getActiveJiraToken } from "@/lib/jiraAuthServer";
 
 // Controller Layer: 요청을 라우팅하고 응답 포맷을 맞춥니다.
 export async function POST(request) {
   try {
     const { jql, fields } = await request.json();
     const xJiraToken = request.headers.get("x-jira-token");
+    const token = getActiveJiraToken(xJiraToken);
     
     // Data Access Layer 호출 (실제 로직 분리)
-    const issues = await fetchJiraSearch(jql, fields, { apiToken: xJiraToken });
+    const issues = await fetchJiraSearch(jql, fields, { apiToken: token });
 
     return NextResponse.json({ issues });
   } catch (error) {

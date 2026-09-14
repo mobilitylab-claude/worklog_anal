@@ -96,8 +96,20 @@ export default function Dashboard() {
     async function fetchAllAccountsWorklogs() {
       setTodayLoading(true);
       try {
-        const stored = localStorage.getItem("jiraAccounts");
-        const accounts = stored ? JSON.parse(stored) : [];
+        let accounts = [];
+        try {
+          const accRes = await fetch("/api/jira-accounts?includeRaw=true");
+          const accData = await accRes.json();
+          if (accData.success && accData.accounts && accData.accounts.length > 0) {
+            accounts = accData.accounts;
+          }
+        } catch (apiErr) {}
+
+        if (accounts.length === 0) {
+          const stored = localStorage.getItem("jiraAccounts");
+          accounts = stored ? JSON.parse(stored) : [];
+        }
+
         if (accounts.length === 0) {
           setTodayWorklogs([]);
           setTodayLoading(false);

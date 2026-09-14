@@ -1,12 +1,13 @@
 import { fetchJiraSearch } from '@/lib/jiraClient';
 import db from '@/lib/db';
+import { getActiveJiraToken } from '@/lib/jiraAuthServer';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
     const xJiraToken = request?.headers?.get('x-jira-token');
-    const JIRA_API_TOKEN = xJiraToken || process.env.JIRA_API_TOKEN;
+    const JIRA_API_TOKEN = getActiveJiraToken(xJiraToken);
 
     const row = db.prepare('SELECT value FROM dashboard_config WHERE key = ?').get('noti_target_USER_WORKLOG');
     const targetStr = row ? row.value : '';

@@ -6,68 +6,141 @@ export default function Header() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [activeId, setActiveId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // 로컬 스토리지에서 계정 정보 불러오기
-    const stored = localStorage.getItem("jiraAccounts");
-    const active = localStorage.getItem("jiraActiveId");
-    if (stored) {
-      setAccounts(JSON.parse(stored));
-    }
-    if (active) {
-      setActiveId(active);
-    }
-  }, []);
+  // DB에서 계정 정보 불러오기 & 필요시 localStorage에서 자동 마이그레이션
+  const loadAccounts = async () => {
+    try {
+      const res = await fetch("/api/jira-accounts?includeRaw=true");
+      const data = await res.json();
 
-  const saveToLocal = (newAccounts, newActiveId) => {
-    localStorage.setItem("jiraAccounts", JSON.stringify(newAccounts));
-    if (newActiveId) {
-      localStorage.setItem("jiraActiveId", newActiveId);
-    } else {
-      localStorage.removeItem("jiraActiveId");
+      if (data.success && data.accounts && data.accounts.length > 0) {
+        setAccounts(data.accounts);
+        setActiveId(data.activeId);
+        // localStorage에도 동기화 캐시
+        localStorage.setItem("jiraAccounts", JSON.stringify(data.accounts));
+        if (data.activeId) localStorage.setItem("jiraActiveId", data.activeId);
+      } else {
+        // DB가 비어있고 localStorage에 기존 계정이 남아있다면 자동 마이그레이션 실행
+        const stored = localStorage.getItem("jiraAccounts");
+        const localActive = localStorage.getItem("jiraActiveId");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              await fetch("/api/jira-accounts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ accounts: parsed, activeId: localActive })
+              });
+              // 마이그레이션 후 다시 조회
+              const reRes = await fetch("/api/jira-accounts?includeRaw=true");
+              const reData = await reRes.json();
+              if (reData.success) {
+                setAccounts(reData.accounts);
+                setActiveId(reData.activeId);
+              }
+            }
+          } catch (migrateErr) {
+            console.error("로컬 계정 DB 마이그레이션 실패:", migrateErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("계정 목록 로드 실패:", err);
+    } finally {
+      setIsLoading(false);
     }
-    setAccounts(newAccounts);
-    setActiveId(newActiveId);
   };
 
-  const handleAddAccount = () => {
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const handleAddAccount = async () => {
     const name = prompt("사용자 이름(또는 별칭)을 입력하세요:");
     if (!name) return;
     const token = prompt(`${name}의 Jira Personal Access Token(PAT)을 입력하세요:`);
     if (!token) return;
 
-    const id = Date.now().toString();
-    const newAccounts = [...accounts, { id, name, token }];
-    // 첫 등록이면 자동으로 활성화
-    const newActiveId = newAccounts.length === 1 ? id : activeId;
-    saveToLocal(newAccounts, newActiveId);
+    try {
+      const res = await fetch("/api/jira-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), token: token.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ 계정이 DB에 암호화되어 안전하게 등록되었습니다.");
+        await loadAccounts();
+      } else {
+        alert("등록 실패: " + data.error);
+      }
+    } catch (e) {
+      alert("오류: " + e.message);
+    }
   };
 
-  const handleEditToken = (id, e) => {
+  const handleEditToken = async (id, e) => {
     e.stopPropagation();
     const acc = accounts.find(a => a.id === id);
     if (!acc) return;
-    const newToken = prompt(`${acc.name}의 새로운 Jira PAT를 입력하세요:`, acc.token);
-    if (!newToken || newToken === acc.token) return;
+    const newToken = prompt(`${acc.name}의 새로운 Jira PAT를 입력하세요:`);
+    if (!newToken) return;
 
-    const newAccounts = accounts.map(a => a.id === id ? { ...a, token: newToken } : a);
-    saveToLocal(newAccounts, activeId);
-    alert("토큰이 업데이트 되었습니다.");
+    try {
+      const res = await fetch("/api/jira-accounts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "updateToken", token: newToken.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ 토큰이 DB에 암호화되어 업데이트되었습니다.");
+        await loadAccounts();
+      } else {
+        alert("수정 실패: " + data.error);
+      }
+    } catch (e) {
+      alert("오류: " + e.message);
+    }
   };
 
-  const handleDeleteAccount = (id, e) => {
+  const handleDeleteAccount = async (id, e) => {
     e.stopPropagation();
-    if (!confirm("이 계정을 삭제하시겠습니까?")) return;
-    const newAccounts = accounts.filter(a => a.id !== id);
-    const newActiveId = activeId === id ? (newAccounts[0]?.id || null) : activeId;
-    saveToLocal(newAccounts, newActiveId);
+    if (!confirm("이 계정을 DB에서 삭제하시겠습니까?")) return;
+
+    try {
+      const res = await fetch(`/api/jira-accounts?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ 계정이 삭제되었습니다.");
+        await loadAccounts();
+      } else {
+        alert("삭제 실패: " + data.error);
+      }
+    } catch (e) {
+      alert("오류: " + e.message);
+    }
   };
 
-  const handleSelectAccount = (id) => {
-    saveToLocal(accounts, id);
-    setShowDropdown(false);
-    // 상태 반영을 위해 새로고침 (간단한 구현)
-    window.location.reload();
+  const handleSelectAccount = async (id) => {
+    try {
+      const res = await fetch("/api/jira-accounts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "setActive" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActiveId(id);
+        localStorage.setItem("jiraActiveId", id);
+        setShowDropdown(false);
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const activeAccount = accounts.find(a => a.id === activeId);
