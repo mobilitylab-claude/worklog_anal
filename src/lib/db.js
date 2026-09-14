@@ -251,6 +251,8 @@ try {
   }
 } catch (err) {
   console.error("Migration for worklog_results table failed:", err);
+}
+
 // ── Jira 계정 및 암호화 토큰 관리 테이블 ───────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS jira_accounts (
