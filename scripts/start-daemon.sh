@@ -18,10 +18,19 @@ case "$1" in
       exit 0
     fi
 
+    # 3000번 포트를 점유하고 있는 기존 프로세스 확인 및 정리
+    OLD_PID=$(lsof -ti:3000 2>/dev/null || fuser 3000/tcp 2>/dev/null | awk '{print $1}')
+    if [ -n "$OLD_PID" ]; then
+      echo "⚠️ 3000번 포트를 이미 점유 중인 기존 프로세스(PID: $OLD_PID)를 감지했습니다."
+      echo "기존 프로세스를 종료하고 새 데몬으로 교체합니다..."
+      kill -9 $OLD_PID 2>/dev/null
+      sleep 1
+    fi
+
     echo "🚀 로컬 전용 Next.js 백엔드 데몬 시작 중 (127.0.0.1:3000)..."
     nohup npm start >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
-    sleep 2
+    sleep 3
 
     if kill -0 $(cat "$PID_FILE") 2>/dev/null; then
       echo "✅ 백엔드 데몬이 정상 구동되었습니다. (PID: $(cat $PID_FILE))"
