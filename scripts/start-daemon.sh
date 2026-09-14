@@ -68,8 +68,20 @@ case "$1" in
     $0 start
     ;;
 
+  rebuild)
+    echo "📦 Next.js 최신 소스코드 빌드 중..."
+    node ./node_modules/next/dist/bin/next build
+    if [ $? -eq 0 ]; then
+      echo "✅ 빌드 완료! 백엔드 데몬을 재시작합니다..."
+      $0 restart
+    else
+      echo "❌ 빌드 실패. 에러 로그를 확인하세요."
+      exit 1
+    fi
+    ;;
+
   *)
-    echo "사용법: $0 {start|stop|restart|status}"
+    echo "사용법: $0 {start|stop|restart|rebuild|status}"
     exit 1
     ;;
 esac

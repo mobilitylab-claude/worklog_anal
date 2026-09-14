@@ -58,16 +58,14 @@ export async function exportIssuesToExcel(issues, filename = "my_assigned_issues
  */
 export function saveWorkbook(xlsx, workbook, filename) {
   try {
-    const wbout = xlsx.write(workbook, { bookType: "xlsx", type: "array" });
-    const u8arr = new Uint8Array(wbout);
-
-    // 1. 데스크톱 앱(Tauri iframe 임베드) 환경: 부모 창으로 데이터 전달하여 네이티브 파일 저장
+    // 1. 데스크톱 앱(Tauri iframe 임베드) 환경: 부모 창으로 Base64 데이터 전달
     if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+      const b64 = xlsx.write(workbook, { bookType: "xlsx", type: "base64" });
       window.parent.postMessage(
         {
           type: "TAURI_DOWNLOAD_EXCEL",
           filename: filename,
-          data: Array.from(u8arr)
+          base64: b64
         },
         "*"
       );
@@ -75,6 +73,8 @@ export function saveWorkbook(xlsx, workbook, filename) {
     }
 
     // 2. 일반 웹 브라우저 환경: Blob 다운로드 수행
+    const wbout = xlsx.write(workbook, { bookType: "xlsx", type: "array" });
+    const u8arr = new Uint8Array(wbout);
     const blob = new Blob([u8arr], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     });
@@ -92,7 +92,11 @@ export function saveWorkbook(xlsx, workbook, filename) {
     }
   } catch (err) {
     console.error("saveWorkbook 오류, fallback 시도:", err);
-    xlsx.writeFile(workbook, filename);
+    try {
+      xlsx.writeFile(workbook, filename);
+    } catch (e2) {
+      alert("엑셀 저장 실패: " + err.message);
+    }
   }
 }
 

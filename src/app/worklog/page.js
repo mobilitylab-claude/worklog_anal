@@ -37,6 +37,7 @@ export default function WorklogAnalyzer() {
   const [targetMode, setTargetMode] = useState("me");
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   // ── 사용자 목록 (DB) ───────────────────────────────────────────
   const [dbUsers, setDbUsers] = useState([]);
@@ -206,7 +207,11 @@ export default function WorklogAnalyzer() {
 
   // ── 엑셀 내보내기 ─────────────────────────────────────────────
   const handleExport = async () => {
-    if (worklogs.length === 0) return;
+    if (worklogs.length === 0) {
+      alert("저장할 작업기록 데이터가 없습니다. 먼저 조회 조건을 설정하고 [조회] 버튼을 눌러주세요.");
+      return;
+    }
+    setIsExporting(true);
     try {
       const xlsx = await import("xlsx-js-style");
       const wb = xlsx.utils.book_new();
@@ -511,6 +516,8 @@ export default function WorklogAnalyzer() {
       saveWorkbook(xlsx, wb, `Jira_Worklog_${startDate}_to_${endDate}.xlsx`);
     } catch (e) {
       alert("엑셀 오류: " + e.message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -833,8 +840,8 @@ export default function WorklogAnalyzer() {
           }} className="btn btn-success">
             ⏰ 스케줄 등록
           </button>
-          <button onClick={handleExport} disabled={worklogs.length === 0} className="btn btn-secondary">
-            📥 엑셀 저장
+          <button onClick={handleExport} disabled={isExporting} className="btn btn-secondary">
+            {isExporting ? "⏳ 생성 중..." : "📥 엑셀 저장"}
           </button>
         </div>
       </div>

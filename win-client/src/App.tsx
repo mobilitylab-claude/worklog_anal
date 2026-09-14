@@ -43,12 +43,24 @@ function App() {
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'TAURI_DOWNLOAD_EXCEL') {
-        const { filename, data } = event.data;
+        const { filename, base64, data } = event.data;
         try {
+          let byteData: number[] = [];
+          if (base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            byteData = new Array(len);
+            for (let i = 0; i < len; i++) {
+              byteData[i] = binaryString.charCodeAt(i);
+            }
+          } else if (Array.isArray(data)) {
+            byteData = data;
+          }
+
           const { invoke } = await import('@tauri-apps/api/core');
           const fullPath = await invoke<string>('save_excel_file', {
             filename,
-            data
+            data: byteData
           });
           setDownloadToast({ show: true, filename, fullPath });
           setLogs(prev => [{
