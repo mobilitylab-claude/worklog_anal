@@ -1,32 +1,27 @@
 @echo off
-setlocal enabledelayedexpansion
-
-title Jira Worklog Studio Tunnel Launcher
+chcp 949 > nul
+title Jira Worklog Studio ?°ì²˜
 
 set "UBUNTU_IP=192.168.105.10"
-set "TARGET_DIR=%~dp0"
-cd /d "%TARGET_DIR%."
+cd /d "%~dp0."
 
 echo ========================================================
-echo   Jira Worklog Studio - SSH Tunnel Launcher
+echo   Jira Worklog Studio - ?í´ë¦??¤í–‰ ?°ì²˜
 echo ========================================================
 echo.
 
-echo [1/2] Checking port 3000 tunnel...
+echo [1/2] 3000ë²??¬íŠ¸ ?íƒœ ?ê? ì¤?..
 netstat -ano | findstr "127.0.0.1:3000" > nul
-if %errorlevel% equ 0 goto tunnel_ok
+if %errorlevel% equ 0 (
+    echo [?ˆë‚´] 3000ë²??¬íŠ¸ê°€ ?œì„±?”ë˜???ˆìŠµ?ˆë‹¤.
+    goto run_app
+)
 
-echo Starting background SSH tunnel to %UBUNTU_IP%...
-start /min "Jira-SSH-Tunnel" ssh -N -L 3000:127.0.0.1:3000 %USERNAME%@%UBUNTU_IP%
-timeout /t 2 > nul
-goto run_app
-
-:tunnel_ok
-echo Port 3000 tunnel is already active.
+echo [?ˆë‚´] ?°ë¶„???œë²„(%UBUNTU_IP%)ë¡?ì§ì ‘ ?°ê²°?©ë‹ˆ??
 
 :run_app
 echo.
-echo [2/2] Launching Jira Worklog Studio...
+echo [2/2] Jira Worklog Studio ?°ìŠ¤?¬í†± ???¤í–‰ ì¤?..
 if exist "src-tauri\target\release\app.exe" (
     start "" "src-tauri\target\release\app.exe"
     goto finish
@@ -36,10 +31,11 @@ if exist "src-tauri\target\release\win-client.exe" (
     goto finish
 )
 
-echo Release build not found. Running dev mode...
+echo [ê²½ê³ ] ë¦´ë¦¬ì¦?ë¹Œë“œë¥?ì°¾ì„ ???†ì–´ ê°œë°œ ëª¨ë“œë¡??¤í–‰?©ë‹ˆ??..
 npm run tauri dev
 
 :finish
-echo Done.
+echo.
+echo [?„ë£Œ] ?¤í–‰???„ë£Œ?˜ì—ˆ?µë‹ˆ?? 2ì´???ì°½ì´ ?ë™?¼ë¡œ ?«íž™?ˆë‹¤.
 timeout /t 2 > nul
 exit
