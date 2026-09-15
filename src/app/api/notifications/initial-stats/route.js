@@ -6,32 +6,42 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const targetUser = searchParams.get('targetUser');
+
     const xJiraToken = request?.headers?.get('x-jira-token');
     const JIRA_API_TOKEN = getActiveJiraToken(xJiraToken);
 
-    const row = db.prepare('SELECT value FROM dashboard_config WHERE key = ?').get('noti_target_USER_WORKLOG');
-    const targetStr = row ? row.value : '';
+    let targets = [];
 
-    // 대상자가 명시적으로 없으면 빈 객체 반환 (전체 사용자를 미리 로드하기엔 부담됨)
-    if (!targetStr) {
-      return Response.json({ success: true, stats: {} });
-    }
+    // 개별 팀원 단독 갱신 요청인 경우
+    if (targetUser && targetUser.trim()) {
+      targets = [targetUser.trim()];
+    } else {
+      // 전체 팀원 갱신/초기 로딩인 경우
+      const row = db.prepare('SELECT value FROM dashboard_config WHERE key = ?').get('noti_target_USER_WORKLOG');
+      const targetStr = row ? row.value : '';
 
-    const rawTargets = targetStr.split(',').map(s => s.trim()).filter(s => s);
-    const targets = [];
-    const seenNames = new Set();
-
-    for (const raw of rawTargets) {
-      // 공백 이전의 순수 이름만 추출 (예: "탄보련 기타모비스온사용자" -> "탄보련")
-      const name = raw.split(' ')[0];
-      if (!seenNames.has(name)) {
-        seenNames.add(name);
-        targets.push(name);
+      // 대상자가 명시적으로 없으면 빈 객체 반환 (전체 사용자를 미리 로드하기엔 부담됨)
+      if (!targetStr) {
+        return Response.json({ success: true, stats: {} });
       }
-    }
 
-    if (targets.length === 0) {
-      return Response.json({ success: true, stats: {} });
+      const rawTargets = targetStr.split(',').map(s => s.trim()).filter(s => s);
+      const seenNames = new Set();
+
+      for (const raw of rawTargets) {
+        // 공백 이전의 순수 이름만 추출 (예: "탄보련 기타모비스온사용자" -> "탄보련")
+        const name = raw.split(' ')[0];
+        if (!seenNames.has(name)) {
+          seenNames.add(name);
+          targets.push(name);
+        }
+      }
+
+      if (targets.length === 0) {
+        return Response.json({ success: true, stats: {} });
+      }
     }
 
     // 기본적으로 모두 0으로 초기화

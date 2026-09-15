@@ -34,6 +34,89 @@ function App() {
   // ── 엑셀 다운로드 완료 토스트 알림 상태 ──
   const [downloadToast, setDownloadToast] = useState<{ show: boolean; filename: string; fullPath: string } | null>(null);
 
+  // ── 수동 갱신 로딩 상태 ──
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+  const [refreshingUser, setRefreshingUser] = useState<string | null>(null);
+
+  // 전체 팀원 작업기록 수동 갱신 함수
+  const refreshAllStats = async () => {
+    if (isRefreshingAll) return;
+    setIsRefreshingAll(true);
+    const targetUrl = serverIp.replace(/\/$/, '');
+
+    try {
+      const res = await fetch(`${targetUrl}/api/notifications/initial-stats`, { cache: 'no-store' });
+      const resData = await res.json();
+      if (resData.success) {
+        if (resData.stats) setUserStats(resData.stats);
+        if (resData.details) setUserDetails(resData.details);
+
+        setLogs(prev => [{
+          id: `manual-all-${Date.now()}`,
+          receiveTime: new Date().toLocaleTimeString(),
+          isRead: false,
+          type: 'info',
+          title: '🔄 전체 팀원 작업기록 갱신 완료',
+          message: `총 ${Object.keys(resData.stats || {}).length}명의 당일 작업기록이 최신화되었습니다.`
+        }, ...prev]);
+      } else {
+        alert("전체 작업기록 갱신 실패: " + (resData.error || "알 수 없는 오류"));
+      }
+    } catch (err: any) {
+      console.error("전체 통계 수동 갱신 오류:", err);
+      alert("전체 작업기록 갱신 중 오류가 발생했습니다: " + err.message);
+    } finally {
+      setIsRefreshingAll(false);
+    }
+  };
+
+  // 개별 팀원 작업기록 수동 갱신 함수
+  const refreshUserStats = async (userName: string) => {
+    if (refreshingUser === userName) return;
+    setRefreshingUser(userName);
+    const targetUrl = serverIp.replace(/\/$/, '');
+
+    try {
+      const res = await fetch(`${targetUrl}/api/notifications/initial-stats?targetUser=${encodeURIComponent(userName)}`, { cache: 'no-store' });
+      const resData = await res.json();
+      if (resData.success) {
+        if (resData.stats && resData.stats[userName] !== undefined) {
+          setUserStats(prev => ({
+            ...prev,
+            [userName]: resData.stats[userName]
+          }));
+        }
+        if (resData.details && resData.details[userName] !== undefined) {
+          setUserDetails(prev => ({
+            ...prev,
+            [userName]: resData.details[userName]
+          }));
+        }
+
+        const count = resData.details?.[userName]?.length || 0;
+        const hrs = resData.stats?.[userName] || 0;
+        setLogs(prev => [{
+          id: `manual-user-${Date.now()}`,
+          receiveTime: new Date().toLocaleTimeString(),
+          isRead: false,
+          type: 'info',
+          title: `🔄 ${userName} 님의 작업기록 갱신`,
+          message: `당일 총 ${hrs}h (${count}건의 이슈) 최신 반영 완료`
+        }, ...prev]);
+      }
+    } catch (err: any) {
+      console.error(`${userName} 작업기록 갱신 오류:`, err);
+    } finally {
+      setRefreshingUser(null);
+    }
+  };
+
+  // 팀원 카드 클릭 핸들러 (선택 및 즉시 최신 작업기록 자동 갱신)
+  const handleSelectUser = (name: string) => {
+    setSelectedUser(name);
+    refreshUserStats(name);
+  };
+
   // 서버 URL 저장
   useEffect(() => {
     localStorage.setItem('jira_server_url', serverIp);
@@ -753,7 +836,32 @@ function App() {
                 <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>👥</span> 팀원별 당일 작업시간 현황
                 </h3>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>카드 클릭 시 상세 워크로그 조회</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>카드 클릭 시 자동 갱신</span>
+                  <button
+                    onClick={refreshAllStats}
+                    disabled={isRefreshingAll}
+                    style={{
+                      background: isRefreshingAll ? '#334155' : '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '5px 12px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: isRefreshingAll ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      transition: 'all 0.2s'
+                    }}
+                    title="모든 팀원의 Jira 당일 작업기록을 즉시 다시 수집합니다"
+                  >
+                    <span>🔄</span>
+                    {isRefreshingAll ? '전체 갱신 중...' : '전체 갱신'}
+                  </button>
+                </div>
               </div>
 
               {Object.keys(userStats).length > 0 ? (
@@ -768,7 +876,7 @@ function App() {
                     return (
                       <div 
                         key={name} 
-                        onClick={() => setSelectedUser(name)}
+                        onClick={() => handleSelectUser(name)}
                         style={{ 
                           background: selectedUser === name ? '#1e293b' : '#111827', 
                           border: selectedUser === name ? '2px solid #3b82f6' : hasUnreadAlert ? '1px solid #ef4444' : '1px solid #1f2937', 
@@ -803,16 +911,48 @@ function App() {
               {selectedUser && (
                 <div style={{ marginTop: '20px', background: '#111827', border: '1px solid #1f2937', borderRadius: '8px', padding: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.95rem' }}>
-                      📋 {selectedUser} 님의 오늘 작업 내역
-                    </h4>
-                    <button 
-                      onClick={() => setSelectedUser(null)}
-                      style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
-                    >
-                      ✕ 닫기
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.95rem' }}>
+                        📋 {selectedUser} 님의 오늘 작업 내역
+                      </h4>
+                      <span style={{ fontSize: '0.8rem', color: '#34d399', fontWeight: 'bold' }}>
+                        ({userStats[selectedUser] || 0}h)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => refreshUserStats(selectedUser)}
+                        disabled={refreshingUser === selectedUser}
+                        style={{
+                          background: refreshingUser === selectedUser ? '#334155' : '#1e293b',
+                          color: '#93c5fd',
+                          border: '1px solid #3b82f6',
+                          borderRadius: '4px',
+                          padding: '3px 8px',
+                          fontSize: '0.75rem',
+                          cursor: refreshingUser === selectedUser ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="이 팀원의 최신 작업기록만 Jira에서 즉시 다시 가져옵니다"
+                      >
+                        🔄 {refreshingUser === selectedUser ? '조회 중...' : '기록 갱신'}
+                      </button>
+                      <button 
+                        onClick={() => setSelectedUser(null)}
+                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
+                      >
+                        ✕ 닫기
+                      </button>
+                    </div>
                   </div>
+
+                  {refreshingUser === selectedUser && (
+                    <div style={{ padding: '8px 12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px dashed #3b82f6', borderRadius: '6px', marginBottom: '10px', fontSize: '0.8rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ⏳ Jira에서 {selectedUser} 님의 최신 작업기록을 조회하고 있습니다...
+                    </div>
+                  )}
                   
                   {userDetails[selectedUser] && userDetails[selectedUser].length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
