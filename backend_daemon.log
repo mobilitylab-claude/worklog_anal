@@ -1,0 +1,439 @@
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 963ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use 127.0.0.1:3000
+    at <unknown> (Error: listen EADDRINUSE: address already in use 127.0.0.1:3000) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '127.0.0.1',
+  port: 3000
+}
+Killed
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 114ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+
+> worklog_anal@1.0.0 start
+> next start -H 0.0.0.0 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+✓ Ready in 120ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+(node:2054752) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 4개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420425, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats] Total Issues: 4
+[Initial Stats] Total Worklogs Fetched: 31
+[Initial Stats] Worklogs Matched User: 31
+[Initial Stats] Worklogs Matched Date (Today): 4
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+
+> worklog_anal@1.0.0 start
+> next start -H 0.0.0.0 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+✓ Ready in 126ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+(node:2056556) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 6개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420430, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats] Total Issues: 6
+[Initial Stats] Total Worklogs Fetched: 56
+[Initial Stats] Worklogs Matched User: 56
+[Initial Stats] Worklogs Matched Date (Today): 7
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 10개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420482, hasWorklog=true, embLogsLen=3
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 10
+[Initial Stats] Total Worklogs Fetched: 63
+[Initial Stats] Worklogs Matched User: 63
+[Initial Stats] Worklogs Matched Date (Today): 11
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+
+> worklog_anal@1.0.0 start
+> next start -H 0.0.0.0 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+✓ Ready in 120ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+(node:2063419) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 10개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420482, hasWorklog=true, embLogsLen=3
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 10
+[Initial Stats] Total Worklogs Fetched: 63
+[Initial Stats] Worklogs Matched User: 63
+[Initial Stats] Worklogs Matched Date (Today): 11
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 10개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420482, hasWorklog=true, embLogsLen=3
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 10
+[Initial Stats] Total Worklogs Fetched: 63
+[Initial Stats] Worklogs Matched User: 63
+[Initial Stats] Worklogs Matched Date (Today): 11
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 10개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420482, hasWorklog=true, embLogsLen=3
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 10
+[Initial Stats] Total Worklogs Fetched: 63
+[Initial Stats] Worklogs Matched User: 63
+[Initial Stats] Worklogs Matched Date (Today): 11
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+
+> worklog_anal@1.0.0 start
+> next start -H 0.0.0.0 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+✓ Ready in 120ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+
+> worklog_anal@1.0.0 start
+> next start -H 0.0.0.0 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+✓ Ready in 123ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+(node:2069779) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 11개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420482, hasWorklog=true, embLogsLen=3
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407334 (count=10)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 11
+[Initial Stats] Total Worklogs Fetched: 73
+[Initial Stats] Worklogs Matched User: 73
+[Initial Stats] Worklogs Matched Date (Today): 12
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 117ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 123ms
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+(node:2072929) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 13개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420552, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420552 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407334 (count=10)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 13
+[Initial Stats] Total Worklogs Fetched: 164
+[Initial Stats] Worklogs Matched User: 164
+[Initial Stats] Worklogs Matched Date (Today): 16
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 13개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420552, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420552 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407334 (count=10)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 13
+[Initial Stats] Total Worklogs Fetched: 164
+[Initial Stats] Worklogs Matched User: 164
+[Initial Stats] Worklogs Matched Date (Today): 16
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 127ms
+(node:2081461) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 13개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420552, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420552 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407334 (count=10)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 13
+[Initial Stats] Total Worklogs Fetched: 164
+[Initial Stats] Worklogs Matched User: 164
+[Initial Stats] Worklogs Matched Date (Today): 16
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 13개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420552, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420552 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407334 (count=10)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 13
+[Initial Stats] Total Worklogs Fetched: 164
+[Initial Stats] Worklogs Matched User: 164
+[Initial Stats] Worklogs Matched Date (Today): 16
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 119ms
+(node:2081551) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 13개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420552, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420552 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407334 (count=10)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 13
+[Initial Stats] Total Worklogs Fetched: 164
+[Initial Stats] Worklogs Matched User: 164
+[Initial Stats] Worklogs Matched Date (Today): 16
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-14
+[Initial Stats] [3/4] 이슈 검색 완료: 13개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-420552, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420552 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420482 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420430 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420425 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419762 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407334 (count=10)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-98843 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-96328 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95875 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-95820 (count=2)
+[Initial Stats] Total Issues: 13
+[Initial Stats] Total Worklogs Fetched: 164
+[Initial Stats] Worklogs Matched User: 164
+[Initial Stats] Worklogs Matched Date (Today): 16
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 238ms
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 118ms
+(node:2362300) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249) AND worklogDate >= 2026-09-15
+[Initial Stats] [3/4] 이슈 검색 완료: 0개의 이슈 발견
+[Initial Stats] Total Issues: 0
+[Initial Stats] Total Worklogs Fetched: 0
+[Initial Stats] Worklogs Matched User: 0
+[Initial Stats] Worklogs Matched Date (Today): 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 22명)
+[Initial Stats] Returning stats for 22 users. Details keys: 22
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-15
+[Initial Stats] [3/4] 이슈 검색 완료: 0개의 이슈 발견
+[Initial Stats] Total Issues: 0
+[Initial Stats] Total Worklogs Fetched: 0
+[Initial Stats] Worklogs Matched User: 0
+[Initial Stats] Worklogs Matched Date (Today): 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1

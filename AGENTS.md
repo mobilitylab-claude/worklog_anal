@@ -1,3 +1,6 @@
+나와의 대화나 진행상태를 한글로 하여 알아 볼 수 있도록 하고
+
+웹 플랫폼으로 개발을 할 때에는 적용가능한 최적화된 패턴기법을 확인해서 적용해줘 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

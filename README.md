@@ -158,3 +158,12 @@ sudo systemctl reload nginx
 > sudo ufw reload
 > ```
 
+즉시 해결 명령어 (우분투 터미널)
+우분투 터미널에서 다음 2줄을 실행해 주세요:
+
+bash
+# 1. 기존 3000번 포트를 점유 중인 프로세스 강제 종료
+sudo fuser -k 3000/tcp
+# (fuser가 없을 경우: lsof -ti:3000 | xargs kill -9)
+# 2. 백엔드 데몬 다시 시작
+./scripts/start-daemon.sh start
