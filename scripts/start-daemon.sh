@@ -13,17 +13,20 @@ LOG_FILE="$PROJECT_DIR/backend_daemon.log"
 
 case "$1" in
   start)
-    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
-      echo "⚠️ 이미 백엔드 데몬이 실행 중입니다. (PID: $(cat $PID_FILE))"
-      exit 0
-    fi
-
-    # 3000번 포트를 점유하고 있는 기존 프로세스 확인 및 정리
-    OLD_PID=$(lsof -ti:3000 2>/dev/null || fuser 3000/tcp 2>/dev/null | awk '{print $1}')
+    # 3000번 포트를 점유하고 있는 기존 프로세스 및 next start 프로세스 확인 및 정리
+    fuser -k -9 3000/tcp 2>/dev/null
+    OLD_PID=$(lsof -ti:3000 2>/dev/null)
     if [ -n "$OLD_PID" ]; then
-      echo "⚠️ 3000번 포트를 이미 점유 중인 기존 프로세스(PID: $OLD_PID)를 감지했습니다."
-      echo "기존 프로세스를 종료하고 새 데몬으로 교체합니다..."
+      echo "⚠️ 3000번 포트를 점유 중인 기존 프로세스(PID: $OLD_PID)를 종료합니다..."
       kill -9 $OLD_PID 2>/dev/null
+      sleep 1
+    fi
+    pkill -9 -f "next start" 2>/dev/null
+
+    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+      echo "⚠️ 기존 백엔드 데몬 종료 중 (PID: $(cat $PID_FILE))..."
+      kill -9 $(cat "$PID_FILE") 2>/dev/null
+      rm -f "$PID_FILE"
       sleep 1
     fi
 
@@ -34,29 +37,38 @@ case "$1" in
 
     if kill -0 $(cat "$PID_FILE") 2>/dev/null; then
       echo "✅ 백엔드 데몬이 정상 구동되었습니다. (PID: $(cat $PID_FILE))"
-      echo "로그 확인: tail -f $LOG_FILE"
+      echo "로그 확인: tail -n 20 $LOG_FILE"
     else
-      echo "❌ 백엔드 데몬 구동 실패. 로그를 확인하세요: $LOG_FILE"
+      echo "❌ 백엔드 데몬 구동 실패. 로그 확인:"
+      tail -n 15 "$LOG_FILE"
       rm -f "$PID_FILE"
       exit 1
     fi
     ;;
 
   stop)
+    echo "🛑 백엔드 데몬 종료 중..."
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
-      echo "🛑 백엔드 데몬 종료 중 (PID: $PID)..."
-      kill "$PID" 2>/dev/null
+      kill -9 "$PID" 2>/dev/null
       rm -f "$PID_FILE"
-      echo "✅ 종료 완료."
-    else
-      echo "⚠️ 실행 중인 PID 파일이 없습니다. (이미 종료됨)"
     fi
+    fuser -k -9 3000/tcp 2>/dev/null
+    OLD_PID=$(lsof -ti:3000 2>/dev/null)
+    if [ -n "$OLD_PID" ]; then
+      kill -9 $OLD_PID 2>/dev/null
+    fi
+    pkill -9 -f "next start" 2>/dev/null
+    sleep 1
+    echo "✅ 종료 완료."
     ;;
 
   status)
-    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
-      echo "🟢 백엔드 데몬 정상 동작 중 (PID: $(cat $PID_FILE), 127.0.0.1:3000)"
+    LISTEN_PID=$(lsof -ti:3000 2>/dev/null || fuser 3000/tcp 2>/dev/null | awk '{print $1}')
+    if [ -n "$LISTEN_PID" ]; then
+      echo "🟢 백엔드 데몬 정상 동작 중 (포트 3000 리슨 PID: $LISTEN_PID)"
+    elif [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+      echo "🟢 백엔드 데몬 프로세스 동작 중 (PID: $(cat $PID_FILE))"
     else
       echo "🔴 백엔드 데몬 정지 상태"
     fi

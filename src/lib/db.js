@@ -29,11 +29,12 @@ db.exec(`
     dt_account TEXT NOT NULL,
     email TEXT NOT NULL,
     is_active INTEGER DEFAULT 1,
+    password TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
 
-// 🚀 [마이그레이션] users 테이블에 is_active 컬럼이 없는 경우 추가
+// 🚀 [마이그레이션] users 테이블에 is_active 및 password 컬럼이 없는 경우 추가
 try {
   const tableInfo = db.prepare("PRAGMA table_info(users)").all();
   const hasIsActive = tableInfo.some(c => c.name === 'is_active');
@@ -41,10 +42,25 @@ try {
     console.log("Adding is_active column to users table...");
     try {
       db.exec("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1");
-      console.log("Migration for users finished successfully.");
+      console.log("Migration for users is_active finished successfully.");
     } catch (alterErr) {
       if (alterErr.message.includes("duplicate column name")) {
         console.log("Column is_active already exists.");
+      } else {
+        throw alterErr;
+      }
+    }
+  }
+
+  const hasPassword = tableInfo.some(c => c.name === 'password');
+  if (!hasPassword) {
+    console.log("Adding password column to users table...");
+    try {
+      db.exec("ALTER TABLE users ADD COLUMN password TEXT");
+      console.log("Migration for users password finished successfully.");
+    } catch (alterErr) {
+      if (alterErr.message.includes("duplicate column name")) {
+        console.log("Column password already exists.");
       } else {
         throw alterErr;
       }

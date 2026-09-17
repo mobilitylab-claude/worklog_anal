@@ -19,7 +19,7 @@ export async function POST(request) {
 
     // 1. 배열 형태의 데이터가 들어온 경우 (엑셀 대량 복붙 일괄 삽입 모드)
     if (Array.isArray(body)) {
-      const insertStmt = db.prepare('INSERT INTO users (part, name, dt_account, email) VALUES (?, ?, ?, ?)');
+      const insertStmt = db.prepare('INSERT INTO users (part, name, dt_account, email, password) VALUES (?, ?, ?, ?, ?)');
       
       // 트랜잭션을 사용하여 수백 건의 데이터도 한 방에 삽입하여 성능 극대화 (better-sqlite3)
       const insertMany = db.transaction((usersToInsert) => {
@@ -27,7 +27,13 @@ export async function POST(request) {
         for (const u of usersToInsert) {
           // 이름이나 DT계정이 없으면 행 건너뜀 (빈 줄 방지)
           if (!u.name || !u.dt_account) continue;
-          insertStmt.run(u.part || "미소속", u.name, u.dt_account, u.email || `${u.dt_account}@mobis.co.kr`);
+          insertStmt.run(
+            u.part || "미소속",
+            u.name,
+            u.dt_account,
+            u.email || `${u.dt_account}@mobis.co.kr`,
+            u.password || null
+          );
           count++;
         }
         return count;
@@ -38,15 +44,15 @@ export async function POST(request) {
     } 
     // 2. 단일 객체 데이터가 들어온 경우 (개별 폼 등록 모드)
     else {
-      const { part, name, dt_account, email } = body;
+      const { part, name, dt_account, email, password } = body;
       if (!name || !dt_account || !email) {
         return NextResponse.json({ error: "이름, DT계정, 이메일은 필수입니다." }, { status: 400 });
       }
 
-      const stmt = db.prepare('INSERT INTO users (part, name, dt_account, email) VALUES (?, ?, ?, ?)');
-      const info = stmt.run(part || "미소속", name, dt_account, email);
+      const stmt = db.prepare('INSERT INTO users (part, name, dt_account, email, password) VALUES (?, ?, ?, ?, ?)');
+      const info = stmt.run(part || "미소속", name, dt_account, email, password || null);
 
-    return NextResponse.json({ success: true, id: info.lastInsertRowid });
+      return NextResponse.json({ success: true, id: info.lastInsertRowid });
     }
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,17 +61,24 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
-    const { id, part, name, dt_account, email, is_active } = await request.json();
+    const body = await request.json();
+    const { id, part, name, dt_account, email, is_active, password } = body;
     if (!id) return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
 
-    let stmt;
-    if (is_active !== undefined) {
-      stmt = db.prepare('UPDATE users SET part = ?, name = ?, dt_account = ?, email = ?, is_active = ? WHERE id = ?');
-      stmt.run(part, name, dt_account, email, is_active ? 1 : 0, id);
-    } else {
-      stmt = db.prepare('UPDATE users SET part = ?, name = ?, dt_account = ?, email = ? WHERE id = ?');
-      stmt.run(part, name, dt_account, email, id);
+    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!existing) {
+      return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
     }
+
+    const newPart = part !== undefined ? part : existing.part;
+    const newName = name !== undefined ? name : existing.name;
+    const newDt = dt_account !== undefined ? dt_account : existing.dt_account;
+    const newEmail = email !== undefined ? email : existing.email;
+    const newPassword = password !== undefined ? password : existing.password;
+    const newIsActive = is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active;
+
+    const stmt = db.prepare('UPDATE users SET part = ?, name = ?, dt_account = ?, email = ?, password = ?, is_active = ? WHERE id = ?');
+    stmt.run(newPart, newName, newDt, newEmail, newPassword, newIsActive, id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

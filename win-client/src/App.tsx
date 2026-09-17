@@ -162,6 +162,18 @@ function App() {
           console.error("엑셀 파일 저장 실패:", err);
           alert(`엑셀 파일 저장 실패: ${err?.message || err}`);
         }
+      } else if (event.data?.type === 'TAURI_COPY_CLIPBOARD') {
+        const { text } = event.data;
+        if (text) {
+          try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('copy_to_clipboard', { text });
+          } catch (e) {
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(text).catch(() => {});
+            }
+          }
+        }
       }
     };
 
@@ -814,6 +826,7 @@ function App() {
                 background: '#0b0f19'
               }}
               sandbox="allow-scripts allow-same-origin allow-downloads allow-forms allow-popups allow-modals"
+              allow="clipboard-read; clipboard-write; fullscreen"
               title="Jira Analytics Dashboard"
             />
           </div>
