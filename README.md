@@ -1,6 +1,8 @@
 # Jira Worklog Analytics Dashboard
 
-사내 Jira Server/Data Center 인스턴스와 연동하여 개인 할당 이슈를 조회하고, 커스텀 JQL(필터)을 로컬에 저장하며, 검색 결과를 Excel 형식으로 내보낼 수 있는 Next.js 15 기반 대시보드 애플리케이션입니다. 
+사내 Jira Server/Data Center 인스턴스와 연동하여 개인 할당 이슈를 조회하고, 커스텀 JQL(필터)을 로컬에 저장하며, 검색 결과를 Excel 형식으로 내보낼 수 있는 Next.js 15 기반 대시보드 및 Windows 데스크톱 하이브리드 애플리케이션입니다.
+
+---
 
 ## ✨ 핵심 기능
 
@@ -9,161 +11,101 @@
   - 특정 프로젝트의 지정된 기간 동안 작성된 워크로그(작업기록)를 다각도로 분석합니다.
   - 부서(파트) 단위 및 개별 인력 단위로 필터링이 가능합니다.
   - 여러 개의 특정 키워드를 포함하거나 제외하여 정확한 작업 내용만 추출할 수 있습니다.
-  - 투입 중인 인력과 미투입 인력을 구분하여 분석에서 제외할 수 있으며, M/M(Man-Month) 달성률을 프로그레스 바로 시각화합니다.
+  - 투입 인력과 미투입 인력을 구분하여 분석에서 제외할 수 있으며, M/M(Man-Month) 달성률을 프로그레스 바로 시각화합니다.
 - **📑 월간 리포트 보관함 & 자동화**: 
   - 현재 설정된 모니터링 조건(키워드, 필터 등)을 DB에 저장하고, 매월 마지막 날 또는 프로젝트 종료일에 자동으로 리포트를 생성합니다.
   - 생성된 리포트는 보관함에 영구 저장되며 엑셀로 원본 다운로드가 가능합니다.
 - **⏱️ 워크로그 분석기**: 부서별/개인별 지라 작업 시간 통계 및 JQL 내역을 확인합니다.
+- **👥 JIRA 사용자 및 팀원 관리 (신규 강화)**: 
+  - **패스워드 관리 및 AES-256 암호화**: 팀원별 JIRA 패스워드를 안전하게 보관(양방향 암호화).
+  - **키워드 기반 랜덤 패스워드 생성기**: 알파벳 대문자/소문자/숫자/특수문자 4종을 반드시 포함하며, 원하는 단어(키워드)를 접두사/접미사/랜덤 위치에 조합하여 생성.
+  - **다차원 필터링**: 소속 파트별, 활성/미투입 상태별, 성명/계정/이메일 실시간 검색.
+  - **컴팩트 모달 UX**: 사용자 등록 양식을 팝업 모달로 분리하여 명부 테이블을 한눈에 파악.
+  - **3중 안전 클립보드 복사**: 웹 API 차단이나 iframe 환경에서도 OS 레벨과 브라우저 fallback을 조합하여 100% 복사 보장.
 - **⚙️ 표준 및 기준 관리**: 프로젝트(계약 과제)의 기간/코드 관리 및 작업 유형(분류 키워드) 뱃지 시각화를 관리합니다.
-- **👥 JIRA 사용자 및 팀원 관리**: 엑셀 복붙을 통해 대량의 팀원을 등록하고 투입(Active)/미투입 상태를 관리합니다.
-- **📋 저장된 필터 관리**: 복잡한 JQL 쿼리를 저장하고 불러옵니다.
+- **🔔 실시간 모니터링 & SSE 스트리밍**: 
+  - Server-Sent Events(SSE) 방식으로 지라 워크로그 등록 및 비정상 입력(프로젝트 오기재, 초과 근무 등)을 실시간 감지.
+  - 15초 간격 하트비트(Keep-Alive Ping) 탑재로 장시간 방화벽/VPN 연결 끊김 방지.
+  - 당일 팀원별 누적 작업시간 도넛 차트 및 원클릭 수동 갱신 지원.
+- **🖥️ Windows 데스크톱 클라이언트(`win-client`)**: 
+  - Rust + Tauri v2 기반 독립 실행형 윈도우 앱.
+  - 단일 인스턴스(중복 실행 방지), 시스템 트레이 상주(창 열기/숨기기/종료), 네이티브 엑셀 저장 연동.
 - **📥 엑셀 내보내기**: 화면에 표시된 모든 분석 데이터와 워크로그 원본을 엑셀(.xlsx)로 추출합니다.
-
-## 🏗️ 아키텍처 및 스택
-- **Framework**: Next.js 15 (App Router, React 19)
-- **Design/UX**: Confluence 스타일의 Dark Mode UX 적용
-- **데이터베이스**: `better-sqlite3` (로컬 파일 기반 `jira_filters.db`)
-- **디자인 패턴**: Controller(API Route), Service(jiraClient), Business Logic(useJiraIssues Custom Hook), View(UI Component)로 서버/클라이언트 로직이 완벽하게 분리된 구조 적용.
 
 ---
 
-## 🚀 설치 방법 (필독: 사내망/프록시 환경 에러 대응)
+## 🏗️ 아키텍처 및 기술 스택
 
-본 프로젝트는 보안이 적용된 사내망 환경(자체 서명된 SSL 인증서 적용 환경)에서 Linux 서버를 타겟으로 동작하도록 구성되었습니다.
-패키지를 설치할 때 사내 방화벽이나 프록시가 외부 라이브러리 정보 다운로드를 해킹으로 간주하고 차단(`SELF_SIGNED_CERT_IN_CHAIN` 에러)하는 문제를 반드시 우회해야 합니다.
+- **Frontend**: Next.js 15 (App Router, React 19), Tailwind CSS 스타일 UX
+- **Desktop Client**: Tauri v2, Rust (윈도우 네이티브 트레이, 클립보드 브릿지, 파일 I/O)
+- **Database**: `better-sqlite3` (로컬 파일 기반 `jira_filters.db`)
+- **Security**: AES-256-GCM 양방향 암호화 (Jira 계정 및 패스워드 안전 저장)
+- **Design Pattern**: Controller(API Route), Service(jiraClient), Business Logic(Custom Hook), View(UI Component) 완벽 분리
 
-**리눅스 터미널에서 아래 명령어를 순서대로 실행하세요:**
+---
 
-### 1단계: NPM SSL 검증 무시 설정 (1회성 우회)
-C++ 컴파일(node-gyp)이 필요한 `better-sqlite3` 패키지를 다운로드할 때 튕기는 현상과 패키지 메타데이터 오류를 방지합니다.
+## 🚀 백엔드 데몬 관리 가이드 (리눅스 서버)
+
+프로젝트 루트에 위치한 `start-daemon.sh` 스크립트를 사용하여 백엔드 서비스를 간편하게 시작, 중지, 재시작 및 상태 확인할 수 있습니다.
+
+```bash
+# 1. 백엔드 데몬 시작 (기존 3000 포트 충돌 자동 감지 및 정리)
+./start-daemon.sh start
+
+# 2. 백엔드 데몬 중지
+./start-daemon.sh stop
+
+# 3. 백엔드 데몬 재시작 (소스 수정 후 추천)
+./start-daemon.sh restart
+
+# 4. 소스 재빌드 후 데몬 재시작 (Next.js 프로덕션 빌드 포함)
+./start-daemon.sh rebuild
+
+# 5. 데몬 상태 확인
+./start-daemon.sh status
+```
+
+> 💡 **데몬 로그 확인**: 데몬의 실시간 출력 및 에러 로그는 프로젝트 루트의 `backend_daemon.log` 파일에 기록됩니다.
+> ```bash
+> tail -f backend_daemon.log
+> ```
+
+---
+
+## 💻 사내망 / 리눅스 빌드 주의사항 (NPM & Native 모듈)
+
+사내망 프록시 환경에서 `better-sqlite3` 등 C++ 컴파일 모듈을 빌드할 때 다음과 같이 SSL 검증을 우회하여 설치합니다:
 
 ```bash
 # npm 자체의 SSL 인증 무시
 npm config set strict-ssl false
 
-# node-gyp 등 Node.js 환경의 전역 SSL 인증 무시 강제
+# Node.js 전역 SSL 인증 무시 강제
 export NODE_TLS_REJECT_UNAUTHORIZED=0
 
-# 필요한 패키지 전체 설치 및 better-sqlite3 수동 설치
+# 패키지 설치
 npm install
-npm install better-sqlite3
-```
-> **⚠️ 주의:** 윈도우 환경(네트워크 공유 폴더)에서 `npm install better-sqlite3`를 편하게 실행하시면 윈도우용으로 빌드되기 때문에 나중에 리눅스 서버에서 Node 아키텍처 불일치 에러가 발생합니다. **반드시 🚀 실제 서버가 구동되는 리눅스 환경 터미널**에서 설치하셔야 합니다!
-
-### 2단계: 환경 변수 설정
-프로젝트 최상단 폴더에 `.env` 파일과 토큰이 잘 있는지 확인합니다.
-```env
-JIRA_HOST=https://jira.yourcompany.com
-JIRA_EMAIL=your_email@yourcompany.com
-JIRA_API_TOKEN=발급받은_Personal_Access_Token_문자열
-```
-
----
-
-## 🏃‍♂️ 최종 실행 방법 (사내망 웹소켓 차단 에러 주의)
-
-Next.js의 개발 모드(`npm run dev`)는 코드 자동 반영(HMR)을 위해 **강제로 리눅스 서버와 브라우저 사이에 웹소켓(ws://) 통신 연결을 시도**합니다.
-하지만 사내 방화벽이나 VPN이 이 **웹소켓(ws://) 프로토콜을 차단**해 버릴 경우, 브라우저의 React 클라이언트 엔진이 이를 감지하지 못하고 치명적인 충돌(Crash)을 일으킵니다. (결과적으로 화면 껍데기만 렌더링되고 버튼 클릭 등의 자바스크립트는 100% 무시되는 이른바 **'하이드레이션 붕괴'** 현상이 발생합니다.)
-
-이러한 사내망 환경에서 버튼을 정상 작동시키고 애플리케이션을 구동하기 위한 유일하고 완벽한 해법은 **웹소켓 동기화 기능이 완전히 아예 제거되는 "운영(Production) 모드"로 빌드**하여 켜는 것입니다.
-
-### 추천 실행 명령어 (운영 모드)
-터미널에서 명령어 2개를 순차적으로 적용합니다.
-
-```bash
-# 1. 운영 환경용으로 파일 최적화 및 빌드 (웹소켓 코드 박멸)
 npm run build
-
-# 2. 프로덕션 서버 시작 (포트 3000 오픈)
-npm start
 ```
 
-서버가 구동되면 웹 브라우저에서 `http://[리눅스_서버_IP]:3000` 으로 접속하여 이용하시면 됩니다. 이제 화면 새로고침 시 100% 정상 작동하며 필터 기능도 문제없이 돌아갑니다!
+> **⚠️ 주의**: 네트워크 드라이브(Z:)에서 직접 `npm install better-sqlite3`를 빌드하면 윈도우 바이너리로 컴파일되어 리눅스에서 구동 시 에러가 발생합니다. 반드시 **실제 서버가 구동되는 리눅스 환경**에서 빌드해야 합니다.
 
 ---
 
 ## ⏰ 월간 리포트 자동 생성(Cron) 가이드
 
-프로젝트 모니터링 메뉴에서 "현재 조건으로 월간 리포트 자동 생성 등록"을 하셨다면, 실제 서버에서 매월 자동으로 동작할 수 있도록 Linux `crontab` 스케줄을 1회 등록해 주셔야 합니다.
+프로젝트 모니터링 메뉴에서 "현재 조건으로 월간 리포트 자동 생성 등록"을 하셨다면, Linux `crontab` 스케줄을 등록합니다:
 
-### [1] 자동 생성 스케줄 등록하기
-1. 터미널(SSH)에 접속 후 아래 명령어로 크론탭 편집기를 엽니다.
-   ```bash
-   crontab -e
-   ```
-2. 파일의 맨 밑으로 이동한 뒤, 매일 밤 11시 50분에 실행되도록 아래 명령어를 복사하여 붙여넣습니다.
-   ```bash
-   50 23 * * * curl -X GET http://localhost:3000/api/cron/monthly-report > /dev/null 2>&1
-   ```
-   > 💡 **참고**: 매일 실행되더라도, 시스템 내부적으로 오늘이 "해당 월의 마지막 날" 이거나 "해당 프로젝트의 마지막 종료일" 인지 스스로 판단하여 조건이 맞을 때만 지라 데이터를 가져옵니다.
-3. 저장하고 빠져나옵니다. (vi의 경우 `ESC` -> `:wq` -> `Enter`)
-
-### [2] 자동 생성 스케줄 삭제/해제하기
-*   **더 이상 자동 리포트가 필요 없는 경우 (Cron 해제)**:
-    1. 다시 `crontab -e` 를 입력하여 편집기를 엽니다.
-    2. 이전에 추가했던 `50 23 * * * curl -X GET ...` 줄을 통째로 지우거나, 맨 앞에 `#`을 붙여 주석 처리합니다.
-    3. 저장하고 빠져나옵니다.
-*   **특정 프로젝트의 스케줄만 지우고 싶은 경우**:
-    시스템 소스코드나 DB를 직접 수정할 필요 없이, 추후 UI 상에 업데이트될 스케줄 관리 메뉴에서 삭제하거나, 직접 SQLite DB(`jira_filters.db`의 `scheduled_reports` 테이블)에서 해당 프로젝트의 레코드를 지워주시면 시스템이 알아서 무시하게 됩니다.
+```bash
+crontab -e
+```
+아래 내용을 추가하여 매일 밤 11시 50분에 자동 실행되도록 설정합니다:
+```bash
+50 23 * * * curl -X GET http://localhost:3000/api/cron/monthly-report > /dev/null 2>&1
+```
 
 ---
 
-## 🔒 Nginx 리버스 프록시 및 사내망(192.168.105.x) IP 접근 제한
+## 🔒 Nginx 리버스 프록시 및 사내망 IP 접근 제한
 
-외부 인터넷이나 타 서브넷 PC의 무단 접근을 차단하고, **오직 로컬 네트워크(`192.168.105.x`) 및 서버 로컬호스트(`127.0.0.1`)에서만 접속**할 수 있도록 Nginx 웹서버를 구성합니다.
-
-프로젝트 루트의 [`nginx.conf.example`](file:///z:/workspace/worklog_anal/nginx.conf.example) 파일을 활용하여 우분투 서버에 다음과 같이 적용합니다.
-
-### 1단계: Nginx 설치
-```bash
-sudo apt update
-sudo apt install nginx -y
-```
-
-### 2단계: Nginx 사이트 설정 등록
-```bash
-# 프로젝트의 템플릿 설정을 Nginx sites-available에 복사
-sudo cp nginx.conf.example /etc/nginx/sites-available/worklog-dashboard
-
-# 사이트 활성화 (심볼릭 링크 생성)
-sudo ln -s /etc/nginx/sites-available/worklog-dashboard /etc/nginx/sites-enabled/
-
-# 기본 default 설정 비활성화 (선택)
-sudo rm -f /etc/nginx/sites-enabled/default
-```
-
-### 3단계: IP 접근 제어 규칙 확인
-`/etc/nginx/sites-available/worklog-dashboard` 내 핵심 설정:
-```nginx
-# 로컬호스트 및 192.168.105.x 대역만 허용하고 그 외 모든 접근 차단
-allow 127.0.0.1;
-allow 192.168.105.0/24;
-deny all;
-```
-
-### 4단계: 설정 검증 및 Nginx 재시작
-```bash
-# Nginx 문법 검사
-sudo nginx -t
-
-# 성공 메시지 확인 후 Nginx 재로드
-sudo systemctl reload nginx
-```
-
-> ⚠️ **주의 (Next.js 3000번 포트 외부 차단)**: 
-> Nginx(80번 포트)를 통해서만 접근하도록 강제하려면, 리눅스 UFW 방화벽에서 3000번 포트의 외부 접근을 막고 80번 포트만 열어주세요:
-> ```bash
-> sudo ufw allow from 192.168.105.0/24 to any port 80 proto tcp
-> sudo ufw delete allow 3000/tcp # (기존에 3000번을 열어두었다면 삭제)
-> sudo ufw reload
-> ```
-
-즉시 해결 명령어 (우분투 터미널)
-우분투 터미널에서 다음 2줄을 실행해 주세요:
-
-bash
-# 1. 기존 3000번 포트를 점유 중인 프로세스 강제 종료
-sudo fuser -k 3000/tcp
-# (fuser가 없을 경우: lsof -ti:3000 | xargs kill -9)
-# 2. 백엔드 데몬 다시 시작
-./scripts/start-daemon.sh start
+외부 인터넷의 무단 접근을 차단하고 로컬 네트워크(`192.168.105.x`) 및 `127.0.0.1`에서만 접속을 허용합니다. 루트의 `nginx.conf.example` 파일을 참조하여 설정합니다.
