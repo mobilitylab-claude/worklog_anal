@@ -437,3 +437,835 @@ Killed
 [Initial Stats] Worklogs Matched Date (Today): 0
 [Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
 [Initial Stats] Returning stats for 1 users. Details keys: 1
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 1229ms
+(node:29481) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-18
+[Initial Stats] [3/4] 이슈 검색 완료: 4개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421468, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421468 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421460 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420556 (count=2)
+[Initial Stats] Total Issues: 4
+[Initial Stats] Total Worklogs Fetched: 33
+[Initial Stats] Worklogs Matched User: 33
+[Initial Stats] Worklogs Matched Date (Today): 6
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-18
+[Initial Stats] [3/4] 이슈 검색 완료: 5개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421468, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421468 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421460 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420556 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418854 (count=7)
+[Initial Stats] Total Issues: 5
+[Initial Stats] Total Worklogs Fetched: 40
+[Initial Stats] Worklogs Matched User: 40
+[Initial Stats] Worklogs Matched Date (Today): 7
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-18
+[Initial Stats] [3/4] 이슈 검색 완료: 18개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421483, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421483 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421468 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421460 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421378 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421310 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421304 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421298 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421296 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420556 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420554 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420242 (count=7)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418881 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418854 (count=7)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-416911 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407532 (count=16)
+[Initial Stats] Total Issues: 18
+[Initial Stats] Total Worklogs Fetched: 86
+[Initial Stats] Worklogs Matched User: 84
+[Initial Stats] Worklogs Matched Date (Today): 26
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-18
+[Initial Stats] [3/4] 이슈 검색 완료: 31개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421618, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/3...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421618 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421600 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421483 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421468 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421460 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421385 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421378 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421310 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421304 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421298 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421296 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420556 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420554 (count=2)
+[Initial Stats] Processing chunk 2/3...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420242 (count=7)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=7)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419745 (count=7)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419030 (count=9)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418881 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418854 (count=7)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-416911 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-414500 (count=18)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-408848 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-407532 (count=16)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-399775 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-393627 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-393454 (count=10)
+[Initial Stats] Processing chunk 3/3...
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-97188 (count=13)
+[Initial Stats] Total Issues: 31
+[Initial Stats] Total Worklogs Fetched: 203
+[Initial Stats] Worklogs Matched User: 201
+[Initial Stats] Worklogs Matched Date (Today): 42
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 19개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Total Issues: 19
+[Initial Stats] Total Worklogs Fetched: 217
+[Initial Stats] Worklogs Matched User: 217
+[Initial Stats] Worklogs Matched Date (Today): 21
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 19개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Total Issues: 19
+[Initial Stats] Total Worklogs Fetched: 217
+[Initial Stats] Worklogs Matched User: 217
+[Initial Stats] Worklogs Matched Date (Today): 21
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+Killed
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 1061ms
+(node:1308817) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 19개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Total Issues: 19
+[Initial Stats] Total Worklogs Fetched: 217
+[Initial Stats] Worklogs Matched User: 217
+[Initial Stats] Worklogs Matched Date (Today): 21
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 19개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Total Issues: 19
+[Initial Stats] Total Worklogs Fetched: 217
+[Initial Stats] Worklogs Matched User: 217
+[Initial Stats] Worklogs Matched Date (Today): 21
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명)
+[Initial Stats] Returning stats for 23 users. Details keys: 23
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC) AND worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명)
+[Initial Stats] Returning stats for 1 users. Details keys: 1
+Killed
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 125ms
+Killed
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 116ms
+(node:1312030) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 19개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [ccnc]을(를) 사용하였습니다. (Issue: AVNSTDG6-421650, Author: 고민영)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(AVNSTDG6-421383)에 작업기록이 등록되었습니다. (Issue: AVNSTDG6-421383, Author: 김윤지)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [ccnc_2601_vrhmi]을(를) 사용하였습니다. (Issue: AVNSTDG6-421383, Author: 김윤지)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(AVNSTDG6-421368)에 작업기록이 등록되었습니다. (Issue: AVNSTDG6-421368, Author: 송승호)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [ccnc_2601_vrhmi]을(를) 사용하였습니다. (Issue: AVNSTDG6-421368, Author: 송승호)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(CCNC)에 작업기록이 등록되었습니다. (Issue: AVNSTDG6-419655, Author: 고민영)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [vr]을(를) 사용하였습니다. (Issue: AVNSTDG6-419655, Author: 고민영)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [qq]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(AVNG6HKMC-86848)에 작업기록이 등록되었습니다. (Issue: AVNG6HKMC-86848, Author: 김윤지)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [code]을(를) 사용하였습니다. (Issue: AVNG6HKMC-86848, Author: 김윤지)
+[Initial Stats] Total Issues: 19
+[Initial Stats] Total Worklogs Fetched: 217
+[Initial Stats] Worklogs Matched User: 217
+[Initial Stats] Worklogs Matched Date (Today): 21
+[Initial Stats] Anomalies/Alerts Found: 10
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명, 이상 항목: 10건)
+[Initial Stats] Returning stats for 23 users. Details keys: 23. Alerts count: 10
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [qq]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 1
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 1건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 김윤지
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT098245) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 2개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421383, hasWorklog=true, embLogsLen=2
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=2)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(AVNSTDG6-421383)에 작업기록이 등록되었습니다. (Issue: AVNSTDG6-421383, Author: 김윤지)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [ccnc_2601_vrhmi]을(를) 사용하였습니다. (Issue: AVNSTDG6-421383, Author: 김윤지)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(AVNG6HKMC-86848)에 작업기록이 등록되었습니다. (Issue: AVNG6HKMC-86848, Author: 김윤지)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [code]을(를) 사용하였습니다. (Issue: AVNG6HKMC-86848, Author: 김윤지)
+[Initial Stats] Total Issues: 2
+[Initial Stats] Total Worklogs Fetched: 118
+[Initial Stats] Worklogs Matched User: 18
+[Initial Stats] Worklogs Matched Date (Today): 2
+[Initial Stats] Anomalies/Alerts Found: 4
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 4건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 4
+[Initial Stats] [1/4] 모니터링 대상자 확인: 고민영
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT098171) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 2개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421650, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [ccnc]을(를) 사용하였습니다. (Issue: AVNSTDG6-421650, Author: 고민영)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(CCNC)에 작업기록이 등록되었습니다. (Issue: AVNSTDG6-419655, Author: 고민영)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [vr]을(를) 사용하였습니다. (Issue: AVNSTDG6-419655, Author: 고민영)
+[Initial Stats] Total Issues: 2
+[Initial Stats] Total Worklogs Fetched: 5
+[Initial Stats] Worklogs Matched User: 4
+[Initial Stats] Worklogs Matched Date (Today): 2
+[Initial Stats] Anomalies/Alerts Found: 3
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 3건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 3
+[Initial Stats] [1/4] 모니터링 대상자 확인: 송승호
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT076611) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 1개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421368, hasWorklog=true, embLogsLen=4
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(AVNSTDG6-421368)에 작업기록이 등록되었습니다. (Issue: AVNSTDG6-421368, Author: 송승호)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [ccnc_2601_vrhmi]을(를) 사용하였습니다. (Issue: AVNSTDG6-421368, Author: 송승호)
+[Initial Stats] Total Issues: 1
+[Initial Stats] Total Worklogs Fetched: 4
+[Initial Stats] Worklogs Matched User: 2
+[Initial Stats] Worklogs Matched Date (Today): 1
+[Initial Stats] Anomalies/Alerts Found: 2
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 2건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 2
+Killed
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 114ms
+(node:1314311) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 19개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [qq]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Total Issues: 19
+[Initial Stats] Total Worklogs Fetched: 217
+[Initial Stats] Worklogs Matched User: 217
+[Initial Stats] Worklogs Matched Date (Today): 21
+[Initial Stats] Anomalies/Alerts Found: 1
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명, 이상 항목: 1건)
+[Initial Stats] Returning stats for 23 users. Details keys: 23. Alerts count: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [qq]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 1
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 1건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 1
+Killed
+
+> worklog_anal@1.0.0 start
+> next start -H 127.0.0.1 -p 3000
+
+▲ Next.js 16.2.1
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 114ms
+(node:1318594) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 19개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [qq]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Total Issues: 19
+[Initial Stats] Total Worklogs Fetched: 218
+[Initial Stats] Worklogs Matched User: 218
+[Initial Stats] Worklogs Matched Date (Today): 22
+[Initial Stats] Anomalies/Alerts Found: 1
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명, 이상 항목: 1건)
+[Initial Stats] Returning stats for 23 users. Details keys: 23. Alerts count: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [qq]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 1
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 1건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Anomaly detected: [INVALID_PROJECT] 미등록 프로젝트 코드 사용 - 미등록 프로젝트(CCNC_2601_VRM)에 작업기록이 등록되었습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [q]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 2
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 2건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 2
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 장현식
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT089354) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421326, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 6
+[Initial Stats] Worklogs Matched User: 6
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 20개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421659, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421544 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Total Issues: 20
+[Initial Stats] Total Worklogs Fetched: 220
+[Initial Stats] Worklogs Matched User: 220
+[Initial Stats] Worklogs Matched Date (Today): 24
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 23 users. Details keys: 23. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Anomaly detected: [INVALID_TASK_TYPE] 미정의 작업유형 - 표준 작업유형 목록에 없는 [m]을(를) 사용하였습니다. (Issue: AVNSTDG6-418853, Author: 정창훈)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 1
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 1건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 1
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 정창훈
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT072597) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 3개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421635, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/1...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=12)
+[Initial Stats] Total Issues: 3
+[Initial Stats] Total Worklogs Fetched: 45
+[Initial Stats] Worklogs Matched User: 37
+[Initial Stats] Worklogs Matched Date (Today): 3
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 1명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 1 users. Details keys: 1. Alerts count: 0
+[Initial Stats] [1/4] 모니터링 대상자 확인: 이종원, 고민영, 김담원, 고아라, 김민경, 김윤지, 백지훈, 송승호, 장세종, 최혁, 탄보련, 권혁민, 김동현, 노예은, 신현민, 윤혜진, 장성민, 장현식, 조진성, 한정호, 정창훈, 김근호, 홍준표
+[Initial Stats] [2/4] JQL 실행: worklogAuthor in (DT065119, DT098171, DT095946, DT099602, DT098172, DT098245, DT102450, DT076611, DT098243, DT091334, DT088041, DT101278, DT072598, DT100473, DT074212, DT072605, DT101199, DT089354, DT089450, DT100472, DT072597, DT109249, DT087498) AND worklogDate >= 2026-09-21
+[Initial Stats] [3/4] 이슈 검색 완료: 26개의 이슈 발견
+[Initial Stats Debug] Sample issue: key=AVNSTDG6-421803, hasWorklog=true, embLogsLen=1
+[Initial Stats] Processing chunk 1/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421803 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421659 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421650 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421635 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421554 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421544 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421464 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421443 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421383 (count=3)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421368 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-421326 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420968 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-420750 (count=5)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419853 (count=14)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419817 (count=8)
+[Initial Stats] Processing chunk 2/2...
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419655 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419267 (count=2)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-419234 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418853 (count=13)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418677 (count=4)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-418246 (count=1)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-408848 (count=6)
+[Initial Stats Debug] Using embedded worklogs for AVNSTDG6-402590 (count=15)
+[Initial Stats Debug] Using embedded worklogs for AVNG6HKMC-86858 (count=2)
+[Initial Stats] Total Issues: 26
+[Initial Stats] Total Worklogs Fetched: 246
+[Initial Stats] Worklogs Matched User: 246
+[Initial Stats] Worklogs Matched Date (Today): 31
+[Initial Stats] Anomalies/Alerts Found: 0
+[Initial Stats] [4/4] 작업기록 분석 완료 (대상자: 23명, 이상 항목: 0건)
+[Initial Stats] Returning stats for 23 users. Details keys: 23. Alerts count: 0

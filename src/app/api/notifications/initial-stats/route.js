@@ -1,6 +1,8 @@
 import { fetchJiraSearch } from '@/lib/jiraClient';
 import db from '@/lib/db';
 import { getActiveJiraToken } from '@/lib/jiraAuthServer';
+import { broadcastNotification } from '@/lib/sseClients';
+import { getMonitoringRules, getValidationStandards, validateSingleWorklog } from '@/lib/worklogValidator';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,9 +82,10 @@ export async function GET(request) {
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
     // JQL을 이용해 대상자들의 오늘자 워크로그 정밀 검색
-    const projectClause = process.env.JIRA_PROJECT || "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
-    const authorCond = dtAccounts.length > 0 ? ` AND worklogAuthor in (${dtAccounts.map(a => `${a}`).join(', ')})` : "";
-    const jql = `${projectClause}${authorCond} AND worklogDate >= ${todayStr}`;
+    // JIRA_PROJECT 환경변수가 명시된 경우에만 해당 프로젝트 필터를 적용하고, 없으면 대상자의 오늘자 모든 워크로그를 조회하여 타 프로젝트 오입력도 검출
+    const projectClause = process.env.JIRA_PROJECT ? `${process.env.JIRA_PROJECT} AND ` : "";
+    const authorCond = dtAccounts.length > 0 ? `worklogAuthor in (${dtAccounts.map(a => `${a}`).join(', ')}) AND ` : "";
+    const jql = `${projectClause}${authorCond}worklogDate >= ${todayStr}`;
     const step2 = `[2/4] JQL 실행: ${jql}`;
     loadingLogs.push(step2);
     console.log(`[Initial Stats] ${step2}`);
@@ -173,6 +176,12 @@ export async function GET(request) {
     let totalWorklogsMatchedUser = 0;
     let totalWorklogsMatchedDate = 0;
 
+    const rules = getMonitoringRules();
+    const { validProjects, completedProjects, validTypes } = getValidationStandards();
+    const alerts = [];
+    const seenAlertIds = new Set();
+    const JIRA_HOST = process.env.JIRA_HOST || JIRA_DOMAIN;
+
     for (const result of results) {
       const { issueKey, wls, summary } = result;
       totalWorklogsFetched += wls.length;
@@ -197,12 +206,46 @@ export async function GET(request) {
               const hours = (w.timeSpentSeconds || 0) / 3600;
               stats[matchedTarget] += hours;
               details[matchedTarget].push({
+                worklogId: w.id || '',
                 issueKey: issueKey,
                 summary: summary,
                 hours: parseFloat(hours.toFixed(1)),
-                comment: w.comment || '',
-                time: w.started
+                comment: typeof w.comment === 'string' ? w.comment : (w.comment?.version ? '' : (w.comment || '')),
+                time: w.started,
+                created: w.created || '',
+                updated: w.updated || '',
+                isEdited: !!(w.updated && w.created && w.updated !== w.created)
               });
+
+              // ── 실시간 포맷/프로젝트코드/작업유형 검증 수행 ──
+              const anomalyAlerts = validateSingleWorklog({
+                wl: w,
+                issueKey,
+                summary,
+                author: matchedTarget,
+                authorId: wlAuthorId,
+                validProjects,
+                completedProjects,
+                validTypes,
+                rules,
+                jiraHost: JIRA_HOST
+              });
+
+              if (Array.isArray(anomalyAlerts) && anomalyAlerts.length > 0) {
+                anomalyAlerts.forEach(anomalyAlert => {
+                  if (!seenAlertIds.has(anomalyAlert.id)) {
+                    seenAlertIds.add(anomalyAlert.id);
+                    alerts.push(anomalyAlert);
+                    console.log(`[Initial Stats] Anomaly detected: [${anomalyAlert.notiType}] ${anomalyAlert.title} - ${anomalyAlert.message} (Issue: ${issueKey}, Author: ${matchedTarget})`);
+                    // 실시간 접속된 클라이언트들에게 SSE 전송
+                    try {
+                      broadcastNotification(anomalyAlert);
+                    } catch (bErr) {
+                      console.error("broadcastNotification error in initial-stats:", bErr);
+                    }
+                  }
+                });
+              }
             }
           }
         }
@@ -213,9 +256,14 @@ export async function GET(request) {
     console.log(`[Initial Stats] Total Worklogs Fetched: ${totalWorklogsFetched}`);
     console.log(`[Initial Stats] Worklogs Matched User: ${totalWorklogsMatchedUser}`);
     console.log(`[Initial Stats] Worklogs Matched Date (Today): ${totalWorklogsMatchedDate}`);
+    console.log(`[Initial Stats] Anomalies/Alerts Found: ${alerts.length}`);
 
     const step3_5 = `[3.5/4] 분석 결과: 작업기록 총 ${totalWorklogsFetched}개 중 대상자 매칭 ${totalWorklogsMatchedUser}개, 오늘 날짜 매칭 ${totalWorklogsMatchedDate}개`;
     loadingLogs.push(step3_5);
+
+    if (alerts.length > 0) {
+      loadingLogs.push(`⚠️ [이상 기록 감지] 당일 작업기록 중 포맷 오류 및 미등록 코드/유형 ${alerts.length}건이 발견되었습니다.`);
+    }
 
     // 포맷팅 (소수점 1자리)
     const formattedStats = {};
@@ -223,7 +271,7 @@ export async function GET(request) {
       formattedStats[name] = parseFloat(val.toFixed(1));
     }
 
-    const step4 = `[4/4] 작업기록 분석 완료 (대상자: ${Object.keys(formattedStats).length}명)`;
+    const step4 = `[4/4] 작업기록 분석 완료 (대상자: ${Object.keys(formattedStats).length}명, 이상 항목: ${alerts.length}건)`;
     loadingLogs.push(step4);
     console.log(`[Initial Stats] ${step4}`);
 
@@ -236,8 +284,8 @@ export async function GET(request) {
       'Expires': '0'
     };
 
-    console.log(`[Initial Stats] Returning stats for ${Object.keys(formattedStats).length} users. Details keys: ${Object.keys(details).length}`);
-    return Response.json({ success: true, stats: formattedStats, details, loadingLogs }, { headers });
+    console.log(`[Initial Stats] Returning stats for ${Object.keys(formattedStats).length} users. Details keys: ${Object.keys(details).length}. Alerts count: ${alerts.length}`);
+    return Response.json({ success: true, stats: formattedStats, details, alerts, loadingLogs }, { headers });
   } catch (e) {
     console.error("Initial stats error:", e);
     return Response.json({ success: false, error: e.message }, {

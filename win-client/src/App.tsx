@@ -38,6 +38,84 @@ function App() {
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const [refreshingUser, setRefreshingUser] = useState<string | null>(null);
 
+  // ── 수동 갱신 시 alert 목록을 동기화하여 해결된 오류는 'resolved' 처리하고 새 오류/수정 히스토리를 반영하는 함수 ──
+  const syncAlertLogs = (targetUser: string | null, rawAlerts: any[]) => {
+    const currentAlerts = Array.isArray(rawAlerts) ? rawAlerts : [];
+    const currentAlertMap = new Map<string, any>(currentAlerts.map((a: any) => [String(a.id), a]));
+    const isTarget = (author: string) => {
+      if (!targetUser) return true;
+      return author === targetUser || author.includes(targetUser) || targetUser.includes(author);
+    };
+
+    setLogs(prev => {
+      const resolvedNotis: any[] = [];
+      const updatedPrev = prev.map((l: any) => {
+        // 대상 팀원의 미해결 비정상 alert인데 이번 응답에 없는 경우 -> Jira에서 정상 수정되었거나 삭제됨!
+        if (!l.resolved && ['INVALID_PROJECT', 'INVALID_TASK_TYPE'].includes(l.notiType) && isTarget(l.author)) {
+          if (!currentAlertMap.has(String(l.id))) {
+            resolvedNotis.push({
+              id: `resolved-noti-${l.id}-${Date.now()}`,
+              receiveTime: new Date().toLocaleTimeString(),
+              isRead: false,
+              type: 'success',
+              notiType: 'WORKLOG_RESOLVED',
+              title: `✨ [수정 완료] ${l.author} 작업기록 정상 반영`,
+              message: `[${l.issueKey}] ${l.title} 항목이 올바른 포맷/내용으로 수정되어 오류가 해소되었습니다.`,
+              issueKey: l.issueKey,
+              author: l.author,
+              worklogId: l.worklogId,
+              previousTitle: l.title,
+              previousMessage: l.message,
+              previousComment: l.comment
+            });
+            return {
+              ...l,
+              resolved: true,
+              isRead: true,
+              resolvedAt: new Date().toLocaleTimeString()
+            };
+          }
+        }
+
+        // 이번에도 여전히 검출된 alert인 경우
+        if (currentAlertMap.has(String(l.id))) {
+          const latest = currentAlertMap.get(String(l.id)) as any;
+          currentAlertMap.delete(String(l.id));
+          return {
+            ...l,
+            ...(latest || {}),
+            resolved: false,
+            isRead: false,
+            receiveTime: new Date().toLocaleTimeString()
+          };
+        }
+
+        return l;
+      });
+
+      // 이번에 새로 검출된 alert들
+      const freshAlerts = Array.from(currentAlertMap.values()).map((a: any) => ({
+        ...a,
+        resolved: false,
+        isRead: false,
+        receiveTime: new Date().toLocaleTimeString()
+      }));
+
+      return [...freshAlerts, ...resolvedNotis, ...updatedPrev];
+    });
+
+    // 신규 이상 항목이 있으면 알림음 발동
+    if (currentAlerts.length > 0) {
+      playSound();
+      showMainWindow();
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(targetUser ? `🚨 [${targetUser}] 비정상 작업기록 감지` : '🚨 비정상 작업기록 감지', {
+          body: currentAlerts[0].message || `${currentAlerts.length}건의 포맷 오류 또는 미정의 항목이 있습니다.`
+        });
+      }
+    }
+  };
+
   // 전체 팀원 작업기록 수동 갱신 함수
   const refreshAllStats = async () => {
     if (isRefreshingAll) return;
@@ -51,13 +129,17 @@ function App() {
         if (resData.stats) setUserStats(resData.stats);
         if (resData.details) setUserDetails(resData.details);
 
+        // ── alert 목록 동기화 (해결된 오류는 resolved 처리 및 수정 히스토리 생성) ──
+        syncAlertLogs(null, resData.alerts || []);
+
+        const alertSuffix = resData.alerts?.length ? ` (⚠️ 이상 항목 ${resData.alerts.length}건 감지)` : '';
         setLogs(prev => [{
           id: `manual-all-${Date.now()}`,
           receiveTime: new Date().toLocaleTimeString(),
           isRead: false,
-          type: 'info',
+          type: resData.alerts?.length ? 'warning' : 'info',
           title: '🔄 전체 팀원 작업기록 갱신 완료',
-          message: `총 ${Object.keys(resData.stats || {}).length}명의 당일 작업기록이 최신화되었습니다.`
+          message: `총 ${Object.keys(resData.stats || {}).length}명의 당일 작업기록이 최신화되었습니다.${alertSuffix}`
         }, ...prev]);
       } else {
         alert("전체 작업기록 갱신 실패: " + (resData.error || "알 수 없는 오류"));
@@ -93,15 +175,19 @@ function App() {
           }));
         }
 
+        // ── alert 목록 동기화 (해당 팀원의 해결된 오류는 resolved 처리 및 수정 히스토리 생성) ──
+        syncAlertLogs(userName, resData.alerts || []);
+
         const count = resData.details?.[userName]?.length || 0;
         const hrs = resData.stats?.[userName] || 0;
+        const alertSuffix = resData.alerts?.length ? ` (⚠️ 이상 항목 ${resData.alerts.length}건)` : '';
         setLogs(prev => [{
           id: `manual-user-${Date.now()}`,
           receiveTime: new Date().toLocaleTimeString(),
           isRead: false,
-          type: 'info',
+          type: resData.alerts?.length ? 'warning' : 'info',
           title: `🔄 ${userName} 님의 작업기록 갱신`,
-          message: `당일 총 ${hrs}h (${count}건의 이슈) 최신 반영 완료`
+          message: `당일 총 ${hrs}h (${count}건의 이슈) 최신 반영 완료${alertSuffix}`
         }, ...prev]);
       }
     } catch (err: any) {
@@ -312,6 +398,15 @@ function App() {
                   if (resData.stats) setUserStats(resData.stats)
                   if (resData.details) setUserDetails(resData.details)
                   
+                  // 초기 로딩 시 감지된 비정상 작업기록 목록 반영
+                  if (Array.isArray(resData.alerts) && resData.alerts.length > 0) {
+                    setLogs(prev => {
+                      const existingIds = new Set(prev.map((l: any) => l.id));
+                      const freshAlerts = resData.alerts.filter((a: any) => !existingIds.has(a.id));
+                      return freshAlerts.length > 0 ? [...freshAlerts, ...prev] : prev;
+                    });
+                  }
+
                   if (resData.loadingLogs) {
                     const logsToAdd = resData.loadingLogs.map((msg: string, idx: number) => ({
                       id: `load-${Date.now()}-${idx}`,
@@ -366,12 +461,23 @@ function App() {
                 setUserDetails(data.details);
               }
             } else {
-              playSound()
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(data.title || "JIRA 알림", { body: data.message })
+              const logId = data.id || `sse-${Date.now()}-${Math.random()}`;
+              let isAlreadyPresent = false;
+              setLogs(prev => {
+                if (prev.some((l: any) => l.id === logId)) {
+                  isAlreadyPresent = true;
+                  return prev;
+                }
+                return [{ ...data, ...baseLog, id: logId }, ...prev];
+              });
+
+              if (!isAlreadyPresent) {
+                playSound();
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification(data.title || "JIRA 알림", { body: data.message });
+                }
+                showMainWindow();
               }
-              showMainWindow()
-              setLogs(prev => [{ ...data, ...baseLog }, ...prev])
             }
           }
         } catch (parseErr) {
@@ -463,9 +569,45 @@ function App() {
     }
   };
 
-  // 통계 계산
-  const alertLogs = logs.filter(log => log.notiType && log.notiType !== 'USER_WORKLOG');
+  // 통계 계산 (해결된 알림은 미확인 오류 통계에서 제외)
+  const alertLogs = logs.filter(log => log.notiType && log.notiType !== 'USER_WORKLOG' && !log.resolved);
   const unreadCount = alertLogs.filter(log => !log.isRead).length;
+
+  // 특정 팀원의 개별 작업기록(item)이 이상 항목인지 매칭하는 헬퍼 함수
+  const getItemAnomalies = (userName: string, item: any) => {
+    if (!userName || !item) return [];
+    const itemComment = (item.comment || '').trim();
+    const itemIssueKey = item.issueKey || '';
+    const itemWorklogId = item.worklogId ? String(item.worklogId) : '';
+
+    return logs.filter(log => {
+      if (!log || !['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType)) {
+        return false;
+      }
+      const authorMatches = log.author && (log.author === userName || log.author.includes(userName) || userName.includes(log.author));
+      if (!authorMatches) return false;
+
+      // worklogId가 일치하는 경우 최우선 매칭
+      if (itemWorklogId && log.worklogId && String(log.worklogId) === itemWorklogId) {
+        return true;
+      }
+
+      // issueKey 일치 여부
+      const issueMatches = log.issueKey && itemIssueKey && log.issueKey === itemIssueKey;
+
+      // 코멘트 일치 여부
+      const logComment = (log.comment || '').trim();
+      let commentMatches = false;
+      if (itemComment && logComment) {
+        commentMatches = itemComment === logComment || itemComment.includes(logComment) || logComment.includes(itemComment);
+      }
+
+      if (issueMatches && commentMatches) return true;
+      if (issueMatches && !itemComment && !logComment) return true;
+      if (commentMatches) return true;
+      return issueMatches;
+    });
+  };
 
   const renderDonut = (hours: number) => {
     const max = 8;
@@ -518,13 +660,17 @@ function App() {
       let icon = '🔔';
 
       if (log.notiType === 'INVALID_PROJECT') {
-        cardBg = isRead ? 'rgba(51, 65, 85, 0.4)' : 'rgba(239, 68, 68, 0.15)';
-        borderLeft = '#ef4444';
-        icon = '🚨';
+        cardBg = (isRead || log.resolved) ? 'rgba(51, 65, 85, 0.4)' : 'rgba(239, 68, 68, 0.15)';
+        borderLeft = log.resolved ? '#10b981' : '#ef4444';
+        icon = log.resolved ? '✓' : '🚨';
       } else if (log.notiType === 'INVALID_TASK_TYPE') {
-        cardBg = isRead ? 'rgba(51, 65, 85, 0.4)' : 'rgba(245, 158, 11, 0.15)';
-        borderLeft = '#f59e0b';
-        icon = '⚠️';
+        cardBg = (isRead || log.resolved) ? 'rgba(51, 65, 85, 0.4)' : 'rgba(245, 158, 11, 0.15)';
+        borderLeft = log.resolved ? '#10b981' : '#f59e0b';
+        icon = log.resolved ? '✓' : '⚠️';
+      } else if (log.notiType === 'WORKLOG_RESOLVED') {
+        cardBg = isRead ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.18)';
+        borderLeft = '#10b981';
+        icon = '✨';
       } else if (log.notiType === 'TIME_EXCEEDED') {
         cardBg = isRead ? 'rgba(51, 65, 85, 0.4)' : 'rgba(236, 72, 153, 0.15)';
         borderLeft = '#ec4899';
@@ -566,9 +712,17 @@ function App() {
               <strong>기록 내용:</strong> {log.comment}
             </div>
           )}
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '8px', display: 'flex', gap: '12px' }}>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
             {log.issueKey && <span>🔑 {log.issueKey}</span>}
-            {log.author && <span>👤 {log.author}</span>}
+            {log.author && (
+              <span 
+                onClick={() => handleSelectUser(log.author)}
+                style={{ cursor: 'pointer', color: '#93c5fd', textDecoration: 'underline', fontWeight: 600 }}
+                title={`${log.author} 님의 작업기록 확인하기`}
+              >
+                👤 {log.author} (내역 보기)
+              </span>
+            )}
           </div>
           {log.url && (
             <a href={log.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.8rem', color: '#60a5fa', textDecoration: 'none' }}>
@@ -877,22 +1031,80 @@ function App() {
                 </div>
               </div>
 
+              {/* ── 전체 갱신/실시간 수집된 이상 항목 상단 경고 배너 ── */}
+              {unreadCount > 0 && (
+                <div style={{
+                  background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.15) 100%)',
+                  border: '1px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  marginBottom: '14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.3rem' }}>🚨</span>
+                    <div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fca5a5' }}>
+                        당일 비정상 작업기록 {unreadCount}건 감지됨
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#e2e8f0', marginTop: '2px' }}>
+                        포맷 미준수, 미등록 프로젝트 코드 또는 미정의 작업유형이 포함되어 있습니다.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {Array.from(new Set(alertLogs.filter(l => !l.isRead).map(l => l.author).filter(Boolean))).map(authorName => (
+                      <button
+                        key={authorName}
+                        onClick={() => handleSelectUser(authorName)}
+                        style={{
+                          background: selectedUser === authorName ? '#ef4444' : 'rgba(239, 68, 68, 0.35)',
+                          color: '#ffffff',
+                          border: '1px solid #ef4444',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s'
+                        }}
+                        title={`${authorName} 님의 상세 내역 확인`}
+                      >
+                        ⚠️ {authorName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {Object.keys(userStats).length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))', gap: '12px' }}>
                   {Object.entries(userStats).map(([name, hours]) => {
-                    const hasUnreadAlert = logs.some(log => 
-                      !log.isRead && 
+                    const userAlerts = logs.filter(log => 
+                      !log.resolved &&
                       ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType) &&
-                      (log.author === name || log.author?.includes(name))
+                      (log.author === name || log.author?.includes(name) || name.includes(log.author || ''))
                     );
+                    const hasUnreadAlert = userAlerts.some(log => !log.isRead);
+                    const alertCount = userAlerts.length;
 
                     return (
                       <div 
                         key={name} 
                         onClick={() => handleSelectUser(name)}
                         style={{ 
-                          background: selectedUser === name ? '#1e293b' : '#111827', 
-                          border: selectedUser === name ? '2px solid #3b82f6' : hasUnreadAlert ? '1px solid #ef4444' : '1px solid #1f2937', 
+                          background: selectedUser === name 
+                            ? (hasUnreadAlert ? 'rgba(239, 68, 68, 0.25)' : '#1e293b')
+                            : (hasUnreadAlert ? 'rgba(239, 68, 68, 0.12)' : '#111827'), 
+                          border: hasUnreadAlert 
+                            ? (selectedUser === name ? '2px solid #ef4444' : '1.5px solid #ef4444') 
+                            : (selectedUser === name ? '2px solid #3b82f6' : '1px solid #1f2937'), 
                           borderRadius: '8px', 
                           padding: '12px', 
                           display: 'flex', 
@@ -900,14 +1112,55 @@ function App() {
                           alignItems: 'center', 
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
-                          position: 'relative'
+                          position: 'relative',
+                          boxShadow: hasUnreadAlert ? '0 0 12px rgba(239, 68, 68, 0.35)' : 'none'
                         }}
                       >
-                        {hasUnreadAlert && (
-                          <span style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></span>
-                        )}
+                        {hasUnreadAlert ? (
+                          <span style={{ 
+                            position: 'absolute', 
+                            top: '6px', 
+                            right: '6px', 
+                            background: '#ef4444', 
+                            color: '#ffffff', 
+                            fontSize: '0.65rem', 
+                            fontWeight: 800, 
+                            padding: '2px 6px', 
+                            borderRadius: '9999px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            🚨 {userAlerts.filter(l => !l.isRead).length}
+                          </span>
+                        ) : alertCount > 0 ? (
+                          <span style={{ 
+                            position: 'absolute', 
+                            top: '6px', 
+                            right: '6px', 
+                            background: '#334155', 
+                            color: '#94a3b8', 
+                            fontSize: '0.65rem', 
+                            fontWeight: 600, 
+                            padding: '1px 5px', 
+                            borderRadius: '9999px' 
+                          }}>
+                            ✓ {alertCount}
+                          </span>
+                        ) : null}
                         {renderDonut(hours)}
-                        <span style={{ marginTop: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc', textAlign: 'center' }}>
+                        <span style={{ 
+                          marginTop: '8px', 
+                          fontSize: '0.85rem', 
+                          fontWeight: 600, 
+                          color: hasUnreadAlert ? '#fca5a5' : '#f8fafc', 
+                          textAlign: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {hasUnreadAlert && <span>⚠️</span>}
                           {name}
                         </span>
                       </div>
@@ -921,70 +1174,288 @@ function App() {
               )}
 
               {/* 선택된 작업자 상세 모달/패널 */}
-              {selectedUser && (
-                <div style={{ marginTop: '20px', background: '#111827', border: '1px solid #1f2937', borderRadius: '8px', padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.95rem' }}>
-                        📋 {selectedUser} 님의 오늘 작업 내역
-                      </h4>
-                      <span style={{ fontSize: '0.8rem', color: '#34d399', fontWeight: 'bold' }}>
-                        ({userStats[selectedUser] || 0}h)
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <button
-                        onClick={() => refreshUserStats(selectedUser)}
-                        disabled={refreshingUser === selectedUser}
-                        style={{
-                          background: refreshingUser === selectedUser ? '#334155' : '#1e293b',
-                          color: '#93c5fd',
-                          border: '1px solid #3b82f6',
-                          borderRadius: '4px',
-                          padding: '3px 8px',
-                          fontSize: '0.75rem',
-                          cursor: refreshingUser === selectedUser ? 'not-allowed' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                        title="이 팀원의 최신 작업기록만 Jira에서 즉시 다시 가져옵니다"
-                      >
-                        🔄 {refreshingUser === selectedUser ? '조회 중...' : '기록 갱신'}
-                      </button>
-                      <button 
-                        onClick={() => setSelectedUser(null)}
-                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
-                      >
-                        ✕ 닫기
-                      </button>
-                    </div>
-                  </div>
+              {selectedUser && (() => {
+                const userActiveAlerts = logs.filter(l => 
+                  !l.resolved &&
+                  ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(l.notiType) &&
+                  (l.author === selectedUser || l.author?.includes(selectedUser) || selectedUser.includes(l.author || ''))
+                );
+                const userResolvedAlerts = logs.filter(l => 
+                  (l.resolved || l.notiType === 'WORKLOG_RESOLVED') &&
+                  (l.author === selectedUser || l.author?.includes(selectedUser) || selectedUser.includes(l.author || ''))
+                );
 
-                  {refreshingUser === selectedUser && (
-                    <div style={{ padding: '8px 12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px dashed #3b82f6', borderRadius: '6px', marginBottom: '10px', fontSize: '0.8rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      ⏳ Jira에서 {selectedUser} 님의 최신 작업기록을 조회하고 있습니다...
+                return (
+                  <div style={{ 
+                    marginTop: '20px', 
+                    background: userActiveAlerts.length > 0 ? 'linear-gradient(180deg, #181c2b 0%, #111827 100%)' : '#111827', 
+                    border: userActiveAlerts.length > 0 ? '1.5px solid #ef4444' : userResolvedAlerts.length > 0 ? '1.5px solid rgba(16, 185, 129, 0.4)' : '1px solid #1f2937', 
+                    borderRadius: '8px', 
+                    padding: '16px',
+                    boxShadow: userActiveAlerts.length > 0 ? '0 4px 16px rgba(239, 68, 68, 0.2)' : 'none'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #1e293b', paddingBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>📋</span> {selectedUser} 님의 당일 작업 내역
+                        </h4>
+                        <span style={{ fontSize: '0.82rem', color: '#34d399', fontWeight: 'bold', background: 'rgba(52, 211, 153, 0.1)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
+                          총 {userStats[selectedUser] || 0}h
+                        </span>
+                        {userActiveAlerts.length > 0 ? (
+                          <span style={{ 
+                            background: '#ef4444', 
+                            color: '#ffffff', 
+                            fontSize: '0.74rem', 
+                            fontWeight: 800, 
+                            padding: '2px 8px', 
+                            borderRadius: '9999px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)'
+                          }}>
+                            🚨 비정상 기록 {userActiveAlerts.length}건 감지됨
+                          </span>
+                        ) : userResolvedAlerts.length > 0 ? (
+                          <span style={{ 
+                            background: 'rgba(16, 185, 129, 0.15)', 
+                            color: '#34d399', 
+                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                            fontSize: '0.74rem', 
+                            fontWeight: 700, 
+                            padding: '2px 8px', 
+                            borderRadius: '9999px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            ✨ 오류 수정 완료 (정상 반영됨)
+                          </span>
+                        ) : null}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={() => refreshUserStats(selectedUser)}
+                          disabled={refreshingUser === selectedUser}
+                          style={{
+                            background: refreshingUser === selectedUser ? '#334155' : '#1e293b',
+                            color: '#93c5fd',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '4px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: refreshingUser === selectedUser ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                          title="이 팀원의 최신 작업기록만 Jira에서 즉시 다시 가져옵니다"
+                        >
+                          🔄 {refreshingUser === selectedUser ? '조회 중...' : '기록 갱신'}
+                        </button>
+                        <button 
+                          onClick={() => setSelectedUser(null)}
+                          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.95rem', padding: '2px 6px' }}
+                          title="닫기"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  
-                  {userDetails[selectedUser] && userDetails[selectedUser].length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {userDetails[selectedUser].map((item, idx) => (
-                        <div key={idx} style={{ background: '#1e293b', padding: '10px', borderRadius: '6px', fontSize: '0.85rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
-                            <span>🔑 {item.issueKey}</span>
-                            <span style={{ color: '#34d399' }}>{item.hours}h</span>
-                          </div>
-                          {item.summary && <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '4px' }}>{item.summary}</div>}
-                          {item.comment && <div style={{ color: '#cbd5e1', fontSize: '0.78rem' }}>💬 {item.comment}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ color: '#64748b', fontSize: '0.85rem' }}>기록된 상세 작업 내역이 없습니다.</div>
-                  )}
-                </div>
-              )}
+
+                    {refreshingUser === selectedUser && (
+                      <div style={{ padding: '10px 14px', background: 'rgba(59, 130, 246, 0.12)', border: '1px dashed #3b82f6', borderRadius: '6px', marginBottom: '12px', fontSize: '0.82rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        ⏳ Jira에서 {selectedUser} 님의 최신 작업기록을 조회하고 있습니다...
+                      </div>
+                    )}
+                    
+                    {userDetails[selectedUser] && userDetails[selectedUser].length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {userDetails[selectedUser].map((item, idx) => {
+                          const anomalies = getItemAnomalies(selectedUser, item);
+                          const activeAnomalies = anomalies.filter(a => !a.resolved);
+                          const hasActiveAnomaly = activeAnomalies.length > 0;
+
+                          // 이전에 이 항목에 오류가 발생했으나 수정되어 해결된 히스토리 매칭
+                          const resolvedAnomalies = logs.filter(l => 
+                            (l.resolved || l.notiType === 'WORKLOG_RESOLVED') &&
+                            (l.author === selectedUser || l.author?.includes(selectedUser) || selectedUser.includes(l.author || '')) &&
+                            (
+                              (item.worklogId && l.worklogId && String(item.worklogId) === String(l.worklogId)) ||
+                              (l.issueKey && item.issueKey && l.issueKey === item.issueKey)
+                            )
+                          );
+                          const hasResolvedHistory = !hasActiveAnomaly && (resolvedAnomalies.length > 0 || item.isEdited);
+
+                          const jiraUrl = `${serverIp.replace(/\/$/, '')}/browse/${item.issueKey}`;
+
+                          return (
+                            <div 
+                              key={idx} 
+                              style={{ 
+                                background: hasActiveAnomaly 
+                                  ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(185, 28, 28, 0.08) 100%)' 
+                                  : '#1e293b', 
+                                border: hasActiveAnomaly 
+                                  ? '1.5px solid #ef4444' 
+                                  : hasResolvedHistory 
+                                    ? '1px solid rgba(16, 185, 129, 0.4)' 
+                                    : '1px solid #334155',
+                                borderLeft: hasActiveAnomaly 
+                                  ? '6px solid #ef4444' 
+                                  : hasResolvedHistory 
+                                    ? '5px solid #10b981' 
+                                    : '4px solid #10b981',
+                                borderRadius: '8px', 
+                                padding: '12px',
+                                fontSize: '0.85rem',
+                                boxShadow: hasActiveAnomaly 
+                                  ? '0 4px 14px rgba(239, 68, 68, 0.22)' 
+                                  : hasResolvedHistory 
+                                    ? '0 2px 10px rgba(16, 185, 129, 0.15)' 
+                                    : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {/* 1. 현재 오류가 있는 경우: 붉은색 오류 경고 배너 */}
+                              {hasActiveAnomaly && (
+                                <div style={{ marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {activeAnomalies.map((anom, aIdx) => (
+                                    <div 
+                                      key={aIdx} 
+                                      style={{ 
+                                        background: 'rgba(239, 68, 68, 0.25)', 
+                                        border: '1px solid #ef4444', 
+                                        borderRadius: '6px', 
+                                        padding: '6px 10px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '2px'
+                                      }}
+                                    >
+                                      <div style={{ color: '#fca5a5', fontWeight: 800, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <span>🚨</span> [{anom.title}]
+                                      </div>
+                                      <div style={{ color: '#fee2e2', fontSize: '0.78rem', lineHeight: '1.4' }}>
+                                        👉 {anom.message}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* 2. 오류가 수정된 히스토리가 있는 경우: 정상 UX와 함께 수정 히스토리 배너 표시 */}
+                              {hasResolvedHistory && (
+                                <div style={{ 
+                                  marginBottom: '8px', 
+                                  background: 'rgba(16, 185, 129, 0.1)', 
+                                  border: '1px solid rgba(16, 185, 129, 0.3)', 
+                                  borderRadius: '6px', 
+                                  padding: '7px 10px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px'
+                                }}>
+                                  <div style={{ color: '#34d399', fontWeight: 800, fontSize: '0.79rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <span>✨</span> 작업기록 수정 히스토리: 정상 반영 완료
+                                  </div>
+                                  <div style={{ color: '#cbd5e1', fontSize: '0.74rem', lineHeight: '1.4' }}>
+                                    {resolvedAnomalies[0]?.previousTitle ? (
+                                      <span>
+                                        이전 오류 <strong style={{ color: '#fca5a5' }}>[{resolvedAnomalies[0].previousTitle}]</strong> ({resolvedAnomalies[0].previousMessage || '포맷/코드 오류'}) 항목이 <strong style={{ color: '#6ee7b7' }}>정상 내용으로 수정되어 오류가 완전히 해소되었습니다.</strong>
+                                      </span>
+                                    ) : (
+                                      <span>Jira에서 작업기록 코멘트가 정상 포맷으로 수정 반영되었습니다.</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 이슈 키 & 소요 시간 */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: '#f8fafc', marginBottom: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '0.9rem', color: hasActiveAnomaly ? '#fca5a5' : '#f8fafc' }}>
+                                    🔑 {item.issueKey}
+                                  </span>
+                                  <a 
+                                    href={activeAnomalies[0]?.url || jiraUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    style={{ 
+                                      color: '#60a5fa', 
+                                      fontSize: '0.74rem', 
+                                      textDecoration: 'none',
+                                      padding: '1px 6px',
+                                      borderRadius: '4px',
+                                      border: '1px solid rgba(96, 165, 250, 0.4)',
+                                      background: 'rgba(96, 165, 250, 0.1)'
+                                    }}
+                                    title="Jira에서 이슈 열기"
+                                  >
+                                    🔗 Jira 열기
+                                  </a>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {hasActiveAnomaly ? (
+                                    <span style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 700, background: 'rgba(239, 68, 68, 0.2)', padding: '1px 6px', borderRadius: '4px' }}>
+                                      수정 필요
+                                    </span>
+                                  ) : hasResolvedHistory ? (
+                                    <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 700, background: 'rgba(16, 185, 129, 0.2)', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                                      ✓ 수정 완료
+                                    </span>
+                                  ) : null}
+                                  <span style={{ color: '#34d399', fontSize: '0.92rem', fontWeight: 700 }}>
+                                    {item.hours}h
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 이슈 요약 */}
+                              {item.summary && (
+                                <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '6px', lineHeight: '1.3' }}>
+                                  {item.summary}
+                                </div>
+                              )}
+
+                              {/* 코멘트 (현재 오류인 경우만 붉은 점선 강조, 정상이거나 수정 완료인 경우 깔끔한 정상 코멘트 박스로 표시) */}
+                              {item.comment ? (
+                                <div style={{ 
+                                  color: hasActiveAnomaly ? '#fed7aa' : '#cbd5e1', 
+                                  fontSize: '0.8rem', 
+                                  marginTop: '6px',
+                                  padding: '8px 10px',
+                                  borderRadius: '5px',
+                                  background: hasActiveAnomaly ? 'rgba(239, 68, 68, 0.12)' : 'rgba(15, 23, 42, 0.6)',
+                                  border: hasActiveAnomaly ? '1px dashed #ef4444' : hasResolvedHistory ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #334155',
+                                  lineHeight: '1.4'
+                                }}>
+                                  <strong style={{ color: hasActiveAnomaly ? '#fca5a5' : hasResolvedHistory ? '#34d399' : '#94a3b8', marginRight: '4px' }}>
+                                    💬 {hasResolvedHistory ? '수정된 코멘트:' : '코멘트:'}
+                                  </strong>
+                                  {item.comment}
+                                </div>
+                              ) : (
+                                hasActiveAnomaly && (
+                                  <div style={{ color: '#f87171', fontSize: '0.78rem', fontStyle: 'italic', marginTop: '4px' }}>
+                                    ⚠️ 코멘트(작업기록 내용)가 작성되지 않았습니다.
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '20px 0' }}>
+                        기록된 상세 작업 내역이 없습니다.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 스플릿 리사이저 바 */}

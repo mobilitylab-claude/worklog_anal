@@ -1,6 +1,7 @@
 import { fetchJiraSearch } from '@/lib/jiraClient';
 import { broadcastNotification, sseClients } from '@/lib/sseClients';
 import db from '@/lib/db';
+import { validateSingleWorklog } from '@/lib/worklogValidator';
 
 export const dynamic = 'force-dynamic';
 
@@ -326,73 +327,33 @@ export async function GET() {
       const timeSpentHours = wl.timeSpentSeconds / 3600;
       let anomalyFound = false;
 
-      // 코멘트에서 프로젝트 코드 및 작업 유형 추출 (Worklog Analyzer 파싱 로직 적용)
-      let parsedProjectCode = prjPrefix;
-      let parsedWorkType = "";
-      const cleanComment = commentStr.trim();
-      
-      const slashMatch = cleanComment.match(/^([^/]+)\s*\/\s*([^/]+)(?:\s*\/[\s\S]*)?$/);
-      const bracketMatch = cleanComment.match(/^\[([^\]]+)\]\s*\[([^\]]+)\]/);
-      
-      if (slashMatch) {
-        parsedProjectCode = slashMatch[1].trim().toLowerCase();
-        parsedWorkType = slashMatch[2].trim().toLowerCase();
-      } else if (bracketMatch) {
-        parsedProjectCode = bracketMatch[1].trim().toLowerCase();
-        parsedWorkType = bracketMatch[2].trim().toLowerCase();
-      } else {
-        const singleBracket = cleanComment.match(/^\[([^\]]+)\]/);
-        if (singleBracket) {
-          parsedProjectCode = singleBracket[1].trim().toLowerCase();
-        }
+      // 워크로그 유효성 검증 (포맷, 프로젝트 코드, 작업유형)
+      const detectedAlerts = validateSingleWorklog({
+        wl,
+        issueKey,
+        summary,
+        author,
+        authorId,
+        validProjects,
+        completedProjects,
+        validTypes,
+        rules,
+        jiraHost: cleanHost
+      });
+
+      if (Array.isArray(detectedAlerts) && detectedAlerts.length > 0) {
+        anomalyFound = true;
+        detectedAlerts.forEach(alertItem => {
+          broadcastNotification(alertItem);
+        });
       }
 
-      // 2. 미등록 프로젝트 또는 완료된 프로젝트 확인
-      const isUnregistered = !validProjects.includes(parsedProjectCode) && !completedProjects.includes(parsedProjectCode);
-      const isCompleted = completedProjects.includes(parsedProjectCode);
-      
-      if (rules.INVALID_PROJECT.isActive && (isUnregistered || isCompleted)) {
-        if (isTargetMatched(rules.INVALID_PROJECT.target, [author, issueKey])) {
-          const problemType = isCompleted ? '완료된 프로젝트' : '미등록 프로젝트';
-          broadcastNotification({
-            notiType: 'INVALID_PROJECT',
-            title: problemType + ' 코드 사용',
-            message: `${problemType}(${parsedProjectCode.toUpperCase()})에 작업기록이 등록되었습니다.`,
-            issueKey,
-            url,
-            author,
-            time: new Date().toLocaleTimeString()
-          });
-          anomalyFound = true;
-        }
-      }
-
-      // 3. 미정의 작업유형 (파싱된 작업유형이 표준 목록에 없거나 형식 오류인 경우)
-      if (rules.INVALID_TASK_TYPE.isActive && !anomalyFound) {
-        // 작업유형이 아예 없거나, 유효한 타입이 아닌 경우
-        if (!parsedWorkType || !validTypes.includes(parsedWorkType)) {
-          if (isTargetMatched(rules.INVALID_TASK_TYPE.target, [author, issueKey])) {
-            broadcastNotification({
-              notiType: 'INVALID_TASK_TYPE',
-              title: '미정의 작업유형',
-              message: `코멘트에 표준 작업유형(예: [개발])이 올바르게 명시되지 않았습니다.`,
-              comment: commentStr,
-              parsedWorkType: parsedWorkType || null,
-              issueKey,
-              url,
-              author,
-              time: new Date().toLocaleTimeString()
-            });
-            anomalyFound = true;
-          }
-        }
-      }
-
-      // 1. 일반 사용자 작업기록 업데이트 현황
+      // 1. 일반 사용자 작업기록 업데이트 현황 (이상 항목이 없을 때만 발송)
       if (rules.USER_WORKLOG.isActive && !anomalyFound) {
         if (isTargetMatched(rules.USER_WORKLOG.target, [author, issueKey])) {
           const dailyTotalHours = await getDailyAccumulatedHours(authorId);
           broadcastNotification({
+            id: `wl-stat-${wlId}`,
             notiType: 'USER_WORKLOG',
             title: `${author}`,
             accumulatedHours: dailyTotalHours.toFixed(1),
