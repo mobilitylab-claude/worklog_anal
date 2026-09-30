@@ -38,6 +38,83 @@ function App() {
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const [refreshingUser, setRefreshingUser] = useState<string | null>(null);
 
+  // ── 자동 모니터링 주기 및 카운트다운 상태 ──
+  const [monitorInterval, setMonitorInterval] = useState<number>(10);
+  const monitorIntervalRef = useRef<number>(10);
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(600);
+  const [isChangingInterval, setIsChangingInterval] = useState(false);
+  const refreshAllStatsRef = useRef<((isAuto?: boolean) => Promise<void>) | null>(null);
+
+  // monitorIntervalRef를 항상 최신 상태로 동기화 (SSE 클로저 문제 방지)
+  useEffect(() => {
+    monitorIntervalRef.current = monitorInterval;
+  }, [monitorInterval]);
+
+  // 자동 갱신 카운트다운 타이머
+  useEffect(() => {
+    if (monitorInterval <= 0) return; // 0분(사용 안 함)이면 카운트다운 정지
+
+    const timer = setInterval(() => {
+      setCountdownSeconds(prev => {
+        if (prev <= 1) {
+          // ⏱️ 주기가 도래했을 때 전체 팀원 작업기록 자동 갱신 실행!
+          if (refreshAllStatsRef.current) {
+            refreshAllStatsRef.current(true);
+          }
+          return monitorIntervalRef.current * 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [monitorInterval]);
+
+  const formatCountdown = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // 모니터링 자동 갱신 주기 변경 핸들러
+  const handleUpdateInterval = async (newVal: number) => {
+    setIsChangingInterval(true);
+    const targetUrl = (serverIp || 'http://localhost:3000').replace(/\/$/, '');
+    try {
+      const res = await fetch(`${targetUrl}/api/notifications/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monitorInterval: newVal })
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+      const data = await res.json();
+      if (data.success) {
+        setMonitorInterval(newVal);
+        monitorIntervalRef.current = newVal;
+        setCountdownSeconds(newVal * 60);
+        setLogs(prev => [{
+          id: `cfg-manual-${Date.now()}`,
+          receiveTime: new Date().toLocaleTimeString(),
+          isRead: false,
+          type: 'info',
+          title: '⚙️ 자동 갱신 주기 변경',
+          message: newVal === 0 
+            ? '자동 업데이트가 비활성화되었습니다. (수동 갱신 전용)' 
+            : `자동 업데이트 주기가 ${newVal}분으로 설정되었습니다.`
+        }, ...prev]);
+      } else {
+        alert('주기 변경 실패: ' + (data.error || '오류'));
+      }
+    } catch (e: any) {
+      console.error('주기 변경 오류:', e);
+      alert(`주기 변경 중 오류가 발생했습니다: ${e.message}\n(서버 접속 주소: ${targetUrl})`);
+    } finally {
+      setIsChangingInterval(false);
+    }
+  };
+
   // ── 수동 갱신 시 alert 목록을 동기화하여 해결된 오류는 'resolved' 처리하고 새 오류/수정 히스토리를 반영하는 함수 ──
   const syncAlertLogs = (targetUser: string | null, rawAlerts: any[]) => {
     const currentAlerts = Array.isArray(rawAlerts) ? rawAlerts : [];
@@ -116,11 +193,11 @@ function App() {
     }
   };
 
-  // 전체 팀원 작업기록 수동 갱신 함수
-  const refreshAllStats = async () => {
+  // 전체 팀원 작업기록 갱신 함수 (isAuto: 자동 주기 갱신 여부)
+  const refreshAllStats = async (isAuto = false) => {
     if (isRefreshingAll) return;
     setIsRefreshingAll(true);
-    const targetUrl = serverIp.replace(/\/$/, '');
+    const targetUrl = (serverIp || 'http://localhost:3000').replace(/\/$/, '');
 
     try {
       const res = await fetch(`${targetUrl}/api/notifications/initial-stats`, { cache: 'no-store' });
@@ -133,24 +210,32 @@ function App() {
         syncAlertLogs(null, resData.alerts || []);
 
         const alertSuffix = resData.alerts?.length ? ` (⚠️ 이상 항목 ${resData.alerts.length}건 감지)` : '';
+        const titleText = isAuto ? '⏱️ 전체 팀원 작업기록 자동 갱신 완료' : '🔄 전체 팀원 작업기록 갱신 완료';
         setLogs(prev => [{
-          id: `manual-all-${Date.now()}`,
+          id: `${isAuto ? 'auto' : 'manual'}-all-${Date.now()}`,
           receiveTime: new Date().toLocaleTimeString(),
           isRead: false,
           type: resData.alerts?.length ? 'warning' : 'info',
-          title: '🔄 전체 팀원 작업기록 갱신 완료',
+          title: titleText,
           message: `총 ${Object.keys(resData.stats || {}).length}명의 당일 작업기록이 최신화되었습니다.${alertSuffix}`
         }, ...prev]);
-      } else {
+      } else if (!isAuto) {
         alert("전체 작업기록 갱신 실패: " + (resData.error || "알 수 없는 오류"));
       }
     } catch (err: any) {
-      console.error("전체 통계 수동 갱신 오류:", err);
-      alert("전체 작업기록 갱신 중 오류가 발생했습니다: " + err.message);
+      console.error("전체 통계 갱신 오류:", err);
+      if (!isAuto) {
+        alert("전체 작업기록 갱신 중 오류가 발생했습니다: " + err.message);
+      }
     } finally {
       setIsRefreshingAll(false);
     }
   };
+
+  // refreshAllStatsRef를 최신 상태로 유지
+  useEffect(() => {
+    refreshAllStatsRef.current = refreshAllStats;
+  });
 
   // 개별 팀원 작업기록 수동 갱신 함수
   const refreshUserStats = async (userName: string) => {
@@ -389,7 +474,18 @@ function App() {
           if (data.type === 'connected') {
             setLogs(prev => [{ ...baseLog, type: 'success', msg: `[${baseLog.receiveTime}] ✅ 백엔드 연결 완료: ${data.message}` }, ...prev])
             setIsConnected(true)
-            setIsConnecting(false)
+            // 현재 설정된 자동 갱신 주기 동기화
+            fetch(`${targetUrl}/api/notifications/status`)
+              .then(r => r.json())
+              .then(statusData => {
+                if (statusData && statusData.monitorInterval !== undefined) {
+                  const sInterval = Number(statusData.monitorInterval);
+                  setMonitorInterval(sInterval);
+                  monitorIntervalRef.current = sInterval;
+                  setCountdownSeconds(sInterval * 60);
+                }
+              })
+              .catch(() => {});
 
             fetch(`${targetUrl}/api/notifications/initial-stats`)
               .then(res => res.json())
@@ -449,6 +545,21 @@ function App() {
                   });
                 }
               }
+            } else if (data.notiType === 'CONFIG_CHANGED') {
+              if (data.monitorInterval !== undefined) {
+                const sInterval = Number(data.monitorInterval);
+                setMonitorInterval(sInterval);
+                monitorIntervalRef.current = sInterval;
+                setCountdownSeconds(sInterval * 60);
+                setLogs(prev => [{
+                  ...baseLog,
+                  type: 'info',
+                  title: '⚙️ 자동 갱신 주기 동기화',
+                  message: sInterval === 0 
+                    ? '서버 설정에 의해 자동 업데이트가 비활성화되었습니다. (수동 갱신 전용)' 
+                    : `서버 설정에 의해 자동 업데이트 주기가 ${sInterval}분으로 변경되었습니다.`
+                }, ...prev]);
+              }
             } else if (data.notiType === 'ALL_USER_STATS') {
               if (data.stats) {
                 setUserStats(prev => {
@@ -459,6 +570,20 @@ function App() {
               }
               if (data.details) {
                 setUserDetails(data.details);
+              }
+
+              // 서버가 전달한 주기가 있거나 최신 ref의 주기로 카운트다운 리셋 (Stale Closure 방지)
+              const currentInterval = (data.monitorInterval !== undefined)
+                ? Number(data.monitorInterval)
+                : monitorIntervalRef.current;
+
+              if (currentInterval !== monitorIntervalRef.current) {
+                setMonitorInterval(currentInterval);
+                monitorIntervalRef.current = currentInterval;
+              }
+
+              if (currentInterval > 0) {
+                setCountdownSeconds(currentInterval * 60);
               }
             } else {
               const logId = data.id || `sse-${Date.now()}-${Math.random()}`;
@@ -999,12 +1124,68 @@ function App() {
               overflowY: 'auto',
               borderRight: '1px solid #1e293b'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
                 <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>👥</span> 팀원별 당일 작업시간 현황
                 </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>카드 클릭 시 자동 갱신</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  {/* 자동 업데이트 주기 선택 드롭다운 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>주기:</span>
+                    <select
+                      value={monitorInterval}
+                      onChange={(e) => handleUpdateInterval(parseInt(e.target.value, 10))}
+                      disabled={isChangingInterval}
+                      style={{
+                        background: '#1e293b',
+                        color: monitorInterval === 0 ? '#fca5a5' : '#38bdf8',
+                        border: monitorInterval === 0 ? '1px solid #ef4444' : '1px solid #38bdf8',
+                        borderRadius: '6px',
+                        padding: '4px 6px',
+                        fontSize: '0.76rem',
+                        fontWeight: 600,
+                        cursor: isChangingInterval ? 'wait' : 'pointer',
+                        outline: 'none'
+                      }}
+                      title="실시간 모니터링 자동 업데이트 주기를 변경합니다 (0: 사용 안 함)"
+                    >
+                      <option value={0}>🚫 자동 갱신 끄기</option>
+                      <option value={3}>⚡ 3분 간격</option>
+                      <option value={5}>⏱️ 5분 간격</option>
+                      <option value={10}>🔄 10분 간격 (권장)</option>
+                      <option value={15}>🕒 15분 간격</option>
+                      <option value={30}>⏳ 30분 간격</option>
+                      <option value={60}>🕐 60분 간격</option>
+                    </select>
+                  </div>
+
+                  {/* 주기/카운트다운 상태 뱃지 */}
+                  {monitorInterval === 0 ? (
+                    <span style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid #ef4444',
+                      color: '#fca5a5',
+                      padding: '3px 8px',
+                      borderRadius: '5px'
+                    }}>
+                      🛑 자동갱신 꺼짐
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid #10b981',
+                      color: '#6ee7b7',
+                      padding: '3px 8px',
+                      borderRadius: '5px'
+                    }} title={`현재 ${monitorInterval}분 주기로 자동 갱신됩니다`}>
+                      ⏱️ {formatCountdown(countdownSeconds)} 후 갱신
+                    </span>
+                  )}
+
                   <button
                     onClick={refreshAllStats}
                     disabled={isRefreshingAll}

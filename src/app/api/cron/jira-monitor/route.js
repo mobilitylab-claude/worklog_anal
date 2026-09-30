@@ -2,6 +2,7 @@ import { fetchJiraSearch } from '@/lib/jiraClient';
 import { broadcastNotification, sseClients } from '@/lib/sseClients';
 import db from '@/lib/db';
 import { validateSingleWorklog } from '@/lib/worklogValidator';
+import { getActiveJiraToken } from '@/lib/jiraAuthServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,8 @@ export async function GET() {
   }
 
   const now = Date.now();
-  if (now - lastRunTime < 1 * 60 * 1000) {
-    return Response.json({ success: true, message: '중복 실행 방지: 최근 1분 이내에 이미 실행되었습니다.' });
+  if (now - lastRunTime < 30 * 1000) {
+    return Response.json({ success: true, message: '중복 실행 방지: 최근 30초 이내에 이미 실행되었습니다.' });
   }
   lastRunTime = now;
 
@@ -94,11 +95,22 @@ export async function GET() {
     } catch (e) {}
   });
 
-  // 최근 20분 이내 업데이트된 이슈만 가볍게 조회
-  const jql = `updated >= -20m`;
+  // 설정된 모니터링 주기에 따라 조회 범위 버퍼 동적 계산 (0: 수동모드일 땐 30분 버퍼, 그 외에는 주기*2분 또는 최소 10분)
+  let monitorInterval = 10;
+  try {
+    const row = db.prepare('SELECT value FROM dashboard_config WHERE key = ?').get('monitor_interval_minutes');
+    if (row && row.value !== undefined) {
+      monitorInterval = parseInt(row.value, 10);
+    }
+  } catch (e) {}
+  const bufferMins = (monitorInterval <= 0) ? 30 : Math.max(monitorInterval * 2, 10);
+  const jql = `updated >= -${bufferMins}m`;
+  // 인증 토큰 획득 (DB 활성 계정의 암호화된 토큰 또는 환경변수)
+  const JIRA_API_TOKEN = getActiveJiraToken();
+
   let issues = [];
   try {
-    issues = await fetchJiraSearch(jql, ['summary', 'timetracking', 'worklog', 'project']);
+    issues = await fetchJiraSearch(jql, ['summary', 'timetracking', 'worklog', 'project'], { apiToken: JIRA_API_TOKEN });
   } catch (err) {
     return Response.json({ success: false, error: err.message });
   }
@@ -144,15 +156,14 @@ export async function GET() {
         const tomorrow = new Date(todayObj.getTime() + 24 * 60 * 60 * 1000);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-        // 특정 프로젝트 및 대상 사용자 계정 기반 워크로그 정밀 JQL
-        const projectClause = process.env.JIRA_PROJECT || "project in (AVNSTDG6, AVNG6HKMC, AVNG6YOC)";
-        const authorCondMon = dtAccounts.length > 0 ? ` AND worklogAuthor in (${dtAccounts.map(a => `${a}`).join(', ')})` : "";
-        const jqlAll = `${projectClause}${authorCondMon} AND worklogDate >= ${todayStr}`;
-        const issuesAll = await fetchJiraSearch(jqlAll, ['summary']);
+        // 특정 프로젝트 및 대상 사용자 계정 기반 워크로그 정밀 JQL (initial-stats와 동일하게 안전 처리)
+        const projectClause = process.env.JIRA_PROJECT ? `${process.env.JIRA_PROJECT} AND ` : "";
+        const authorCondMon = dtAccounts.length > 0 ? `worklogAuthor in (${dtAccounts.map(a => `${a}`).join(', ')}) AND ` : "";
+        const jqlAll = `${projectClause}${authorCondMon}worklogDate >= ${todayStr}`;
+        const issuesAll = await fetchJiraSearch(jqlAll, ['summary'], { apiToken: JIRA_API_TOKEN });
         
         const JIRA_DOMAIN_MON = (process.env.JIRA_DOMAIN || process.env.JIRA_HOST || "").replace(/\/$/, "");
-        const JIRA_API_TOKEN_MON = process.env.JIRA_API_TOKEN;
-        const authHeaderMon = `Bearer ${JIRA_API_TOKEN_MON}`;
+        const authHeaderMon = `Bearer ${JIRA_API_TOKEN}`;
 
         const results = [];
         const chunkSize = 5;
@@ -370,13 +381,14 @@ export async function GET() {
 
   if (notifiedCache.size > 5000) notifiedCache.clear();
 
-  // 매 크론 실행마다(10분 간격) 현재 시점의 전체 모니터링 대상자 누적 시간을 브로드캐스트
+  // 매 크론 실행마다(설정된 간격) 현재 시점의 전체 모니터링 대상자 누적 시간을 브로드캐스트
   try {
     if (rules.USER_WORKLOG.isActive && rules.USER_WORKLOG.target) {
       broadcastNotification({
         notiType: 'ALL_USER_STATS',
         stats: userDailyHoursCache,
         details: userDetailsCache,
+        monitorInterval,
         time: new Date().toLocaleTimeString()
       });
     }

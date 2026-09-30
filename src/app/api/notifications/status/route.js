@@ -1,7 +1,20 @@
-import { sseClients } from '@/lib/sseClients';
+import { sseClients, updatePollingInterval, getMonitorInterval } from '@/lib/sseClients';
 import db from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
 
 export async function GET() {
   const getConfig = (key, defaultVal) => {
@@ -26,32 +39,50 @@ export async function GET() {
     TIME_EXCEEDED: getRuleData('TIME_EXCEEDED')
   };
 
+  const monitorInterval = getMonitorInterval();
+
   return Response.json({
     connectedClients: sseClients.size,
+    monitorInterval,
     rules
+  }, {
+    headers: corsHeaders
   });
 }
 
 export async function POST(request) {
-  const data = await request.json();
-  const { ruleKey, isActive, target } = data;
-  
   try {
+    const data = await request.json();
+    const { ruleKey, isActive, target, monitorInterval } = data;
+    
     const stmt = db.prepare(`
       INSERT INTO dashboard_config (key, value) 
       VALUES (?, ?) 
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `);
     
-    if (isActive !== undefined) {
-      stmt.run(`noti_rule_${ruleKey}`, isActive ? 'true' : 'false');
+    if (ruleKey) {
+      if (isActive !== undefined) {
+        stmt.run(`noti_rule_${ruleKey}`, isActive ? 'true' : 'false');
+      }
+      if (target !== undefined) {
+        stmt.run(`noti_target_${ruleKey}`, target);
+      }
     }
-    if (target !== undefined) {
-      stmt.run(`noti_target_${ruleKey}`, target);
+
+    if (monitorInterval !== undefined) {
+      const intervalVal = parseInt(monitorInterval, 10);
+      const safeInterval = isNaN(intervalVal) ? 10 : Math.max(0, intervalVal);
+      stmt.run('monitor_interval_minutes', String(safeInterval));
+      updatePollingInterval(safeInterval);
     }
     
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: corsHeaders });
   } catch (err) {
-    return Response.json({ success: false, error: err.message }, { status: 500 });
+    console.error("status POST error:", err);
+    return Response.json({ success: false, error: err.message }, { 
+      status: 500, 
+      headers: corsHeaders 
+    });
   }
 }

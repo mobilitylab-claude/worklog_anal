@@ -2,9 +2,22 @@
 
 import { useState, useEffect } from "react";
 
+const INTERVAL_OPTIONS = [
+  { value: 0, label: "🚫 사용 안 함 (수동 전용)", desc: "자동 폴링을 끄고, 필요 시 수동 갱신만 수행합니다." },
+  { value: 3, label: "⚡ 3분", desc: "매우 빠른 주기 (테스트 및 빠른 피드백)" },
+  { value: 5, label: "⏱️ 5분", desc: "빠른 주기 (활발한 업무 시간대 권장)" },
+  { value: 10, label: "🔄 10분 (기본 권장)", desc: "안정적인 표준 주기 (Jira 부하 최소화)" },
+  { value: 15, label: "🕒 15분", desc: "여유로운 주기" },
+  { value: 30, label: "⏳ 30분", desc: "긴 주기 (서버 리소스 절약)" },
+  { value: 60, label: "🕐 60분 (1시간)", desc: "시간 단위 주기" },
+];
+
 export default function NotificationsPage() {
   const [webhookUrl, setWebhookUrl] = useState("http://<your-linux-ip>:3000/api/cron/jira-monitor");
   const [status, setStatus] = useState(null);
+  const [monitorInterval, setMonitorInterval] = useState(10);
+  const [isSavingInterval, setIsSavingInterval] = useState(false);
+  const [intervalSuccessMsg, setIntervalSuccessMsg] = useState("");
   const [users, setUsers] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
@@ -18,6 +31,9 @@ export default function NotificationsPage() {
       const res = await fetch("/api/notifications/status");
       const data = await res.json();
       setStatus(data);
+      if (data.monitorInterval !== undefined) {
+        setMonitorInterval(data.monitorInterval);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -39,6 +55,37 @@ export default function NotificationsPage() {
     const timer = setInterval(fetchStatus, 10000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleIntervalChange = async (newVal) => {
+    const val = parseInt(newVal, 10);
+    setMonitorInterval(val);
+    setIsSavingInterval(true);
+    setIntervalSuccessMsg("");
+
+    try {
+      const res = await fetch("/api/notifications/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monitorInterval: val })
+      });
+      const resData = await res.json();
+      if (resData.success) {
+        setIntervalSuccessMsg(val === 0 
+          ? "✅ 자동 업데이트가 비활성화되었습니다. (수동 갱신 전용)" 
+          : `✅ 자동 업데이트 주기가 ${val}분으로 변경되었습니다.`
+        );
+        fetchStatus();
+        setTimeout(() => setIntervalSuccessMsg(""), 4000);
+      } else {
+        alert("주기 변경 실패: " + (resData.error || "오류"));
+      }
+    } catch (e) {
+      console.error("주기 변경 중 오류:", e);
+      alert("주기 변경 중 오류가 발생했습니다.");
+    } finally {
+      setIsSavingInterval(false);
+    }
+  };
 
   const toggleRule = async (ruleKey, currentVal) => {
     const isActive = !currentVal;
@@ -119,54 +166,36 @@ export default function NotificationsPage() {
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
             <input 
               type="text" 
-              placeholder="전체 대상" 
-              value={target}
-              readOnly
-              style={{ 
-                flex: 1, 
-                padding: "6px 10px", 
-                borderRadius: "4px", 
-                border: "1px solid #444", 
-                background: "#111", 
-                color: "#fff",
-                fontSize: "0.85rem",
-                opacity: isActive ? 1 : 0.5,
-                cursor: "default"
-              }}
+              value={target} 
+              readOnly 
+              placeholder="전체 대상 (비어있음)" 
+              style={{ width: "240px", padding: "0.4rem 0.6rem", borderRadius: "4px", background: "#111", border: "1px solid #444", color: "#ccc", fontSize: "0.85rem" }} 
             />
             <button 
               onClick={() => openModal(ruleKey, target)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "4px",
-                background: "var(--accent-color)",
-                color: "#fff",
-                border: "none",
-                fontSize: "0.8rem",
-                cursor: isActive ? "pointer" : "not-allowed",
-                fontWeight: "bold",
-                opacity: isActive ? 1 : 0.5
-              }}
-              disabled={!isActive}
+              style={{ padding: "0.4rem 0.8rem", borderRadius: "4px", background: "#333", border: "1px solid #555", color: "white", fontSize: "0.8rem", cursor: "pointer" }}
             >
-              대상 편집
+              대상 설정
             </button>
           </div>
           <div style={{ fontSize: "0.75rem", color: "#777" }}>비워두면 전체 대상입니다. (⚠️ 규칙이 [활성] 상태여야만 모니터링이 동작합니다)</div>
         </td>
-        <td style={{ padding: "1rem", borderBottom: "1px solid #222", textAlign: "center" }}>
+        <td style={{ padding: "1rem", borderBottom: "1px solid #222" }}>
           <button 
             onClick={() => toggleRule(ruleKey, isActive)}
             style={{ 
-              padding: "6px 12px", 
-              borderRadius: "4px", 
+              padding: "0.4rem 1rem", 
+              borderRadius: "20px", 
               border: "none", 
               cursor: "pointer",
-              background: isActive ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
-              color: isActive ? "#34d399" : "#f87171",
-              fontWeight: "bold"
-            }}>
-            {isActive ? "활성 (ON)" : "비활성 (OFF)"}
+              background: isActive ? "#10b981" : "#4b5563",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "0.85rem",
+              transition: "all 0.2s"
+            }}
+          >
+            {isActive ? "활성" : "비활성"}
           </button>
         </td>
       </tr>
@@ -174,32 +203,44 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="page-container" style={{ position: "relative" }}>
+    <div className="container" style={{ padding: "2rem", maxWidth: "1000px", margin: "0 auto" }}>
+      {/* 대상 선택 모달 */}
       {modalOpen && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 9999,
-          display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)"
-        }}>
-          <div style={{
-            background: "var(--card-bg, #1a1a2e)", border: "1px solid #334", borderRadius: "16px",
-            padding: "2rem", width: "90%", maxWidth: "600px", maxHeight: "90vh", overflowY: "auto"
-          }}>
-            <h2 style={{ marginBottom: "1rem", borderBottom: "1px solid #333", paddingBottom: "0.5rem" }}>👥 알림 대상 선택</h2>
-            
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
+          <div style={{ background: "#222", padding: "2rem", borderRadius: "12px", width: "550px", border: "1px solid #444", maxHeight: "80vh", overflowY: "auto" }}>
+            <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>알림 대상 설정</h3>
+            <p style={{ fontSize: "0.85rem", color: "#aaa", marginBottom: "1.5rem" }}>
+              모니터링 알림을 수신할 특정 그룹(파트)이나 담당자를 선택하세요.
+            </p>
+
             <div style={{ marginBottom: "1.5rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "var(--accent-color)", fontWeight: 600 }}>📁 부서(파트) 단위 일괄 추가</label>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>🏢 파트(그룹) 일괄 선택</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {partsList.map(p => (
-                  <label key={p} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", padding: "4px 10px", borderRadius: "16px", border: `1px solid ${selectedGroups.includes(p) ? "var(--accent-color)" : "#444"}`, background: selectedGroups.includes(p) ? "rgba(59,130,246,0.1)" : "transparent", cursor: "pointer" }}>
-                    <input type="checkbox" checked={selectedGroups.includes(p)} onChange={() => handleGroupToggle(p)} />
-                    <span style={{ color: selectedGroups.includes(p) ? "white" : "gray" }}>{p}</span>
-                  </label>
-                ))}
+                {partsList.map(part => {
+                  const isSelected = selectedGroups.includes(part);
+                  return (
+                    <button 
+                      key={part} 
+                      onClick={() => handleGroupToggle(part)}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "15px",
+                        fontSize: "0.8rem",
+                        cursor: "pointer",
+                        border: isSelected ? "1px solid #3b82f6" : "1px solid #444",
+                        background: isSelected ? "rgba(59, 130, 246, 0.2)" : "#333",
+                        color: isSelected ? "#60a5fa" : "#ccc"
+                      }}
+                    >
+                      {isSelected ? "✓ " : "+ "}{part}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div style={{ marginBottom: "1.5rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>👤 세별 인원 직접 선택</label>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>👤 개별 인원 직접 선택</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", maxHeight: "200px", overflowY: "auto", padding: "1rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid #333" }}>
                 {users.filter(u => u.is_active).map(u => {
                   const isChecked = tempTarget.split(',').map(s => s.trim()).includes(u.name);
@@ -232,8 +273,74 @@ export default function NotificationsPage() {
         </div>
       )}
       <div className="page-header" style={{ marginBottom: "2rem" }}>
-        <h1>🔔 JIRA 알림 규칙 관리</h1>
-        <p>Jira 이벤트 모니터링 규칙을 설정하고, Windows PC 클라이언트로 전송할 알림 항목을 실시간으로 제어합니다.</p>
+        <h1>🔔 JIRA 알림 및 모니터링 설정</h1>
+        <p>Jira 이벤트 모니터링 규칙을 설정하고, Windows PC 클라이언트로 전송할 알림 항목 및 자동 업데이트 주기를 실시간으로 제어합니다.</p>
+      </div>
+
+      {/* ── ⏱️ 신규 기능: 자동 업데이트 주기 설정 카드 ── */}
+      <div className="card" style={{ marginBottom: "2rem", border: "1px solid #334155", background: "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
+          <div>
+            <h2 style={{ fontSize: "1.2rem", margin: "0 0 0.4rem 0", display: "flex", alignItems: "center", gap: "8px", color: "#f8fafc" }}>
+              <span>⏱️</span> 실시간 모니터링 자동 업데이트 주기
+            </h2>
+            <p style={{ color: "#94a3b8", fontSize: "0.88rem", margin: 0 }}>
+              PC 클라이언트가 켜져 있을 때 백그라운드에서 사내 Jira를 자동 조회하는 간격입니다. <br/>
+              <b>'사용 안 함'</b>을 선택하면 자동 주기 폴링이 즉시 중지되며, 데스크톱 앱에서 [수동 갱신] 버튼을 누를 때만 데이터를 가져옵니다.
+            </p>
+          </div>
+          <div style={{
+            padding: "6px 14px",
+            borderRadius: "20px",
+            fontSize: "0.82rem",
+            fontWeight: 700,
+            background: monitorInterval === 0 ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)",
+            border: monitorInterval === 0 ? "1px solid #ef4444" : "1px solid #10b981",
+            color: monitorInterval === 0 ? "#fca5a5" : "#6ee7b7",
+            whiteSpace: "nowrap"
+          }}>
+            {monitorInterval === 0 ? "🛑 자동 업데이트 꺼짐 (수동 갱신 모드)" : `🟢 ${monitorInterval}분 간격 자동 갱신`}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "1.2rem" }}>
+          {INTERVAL_OPTIONS.map(opt => {
+            const isSelected = monitorInterval === opt.value;
+            return (
+              <button
+                key={opt.value}
+                disabled={isSavingInterval}
+                onClick={() => handleIntervalChange(opt.value)}
+                style={{
+                  flex: "1 1 calc(25% - 0.75rem)",
+                  minWidth: "150px",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  cursor: isSavingInterval ? "wait" : "pointer",
+                  textAlign: "left",
+                  border: isSelected ? "2px solid #3b82f6" : "1px solid #334155",
+                  background: isSelected ? "rgba(59, 130, 246, 0.25)" : "#1e293b",
+                  color: isSelected ? "#ffffff" : "#cbd5e1",
+                  transition: "all 0.15s ease",
+                  boxShadow: isSelected ? "0 0 12px rgba(59, 130, 246, 0.3)" : "none"
+                }}
+              >
+                <div style={{ fontWeight: isSelected ? 800 : 600, fontSize: "0.92rem", marginBottom: "3px", color: isSelected ? "#93c5fd" : "#e2e8f0" }}>
+                  {opt.label}
+                </div>
+                <div style={{ fontSize: "0.74rem", color: isSelected ? "#cbd5e1" : "#64748b", lineHeight: 1.3 }}>
+                  {opt.desc}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {intervalSuccessMsg && (
+          <div style={{ marginTop: "1rem", padding: "8px 12px", background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", borderRadius: "6px", color: "#34d399", fontSize: "0.85rem" }}>
+            {intervalSuccessMsg}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: "2rem" }}>
@@ -249,7 +356,13 @@ export default function NotificationsPage() {
             style={{ flex: 1, padding: "0.8rem", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "white" }} 
             readOnly
           />
-          <button style={{ padding: "0.8rem 1.5rem", borderRadius: "8px", background: "var(--accent-color)", color: "white", border: "none", cursor: "pointer", fontWeight: "bold" }}>
+          <button 
+            onClick={() => {
+              navigator.clipboard?.writeText(webhookUrl);
+              alert("URL이 클립보드에 복사되었습니다.");
+            }}
+            style={{ padding: "0.8rem 1.5rem", borderRadius: "8px", background: "var(--accent-color)", color: "white", border: "none", cursor: "pointer", fontWeight: "bold" }}
+          >
             URL 복사
           </button>
         </div>
