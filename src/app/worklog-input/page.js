@@ -631,7 +631,7 @@ export default function WorklogInput() {
                     <div style={{ fontSize: "0.82rem", color: "white", fontWeight: "bold", marginBottom: "0.4rem" }}>
                       {log.issueSummary}
                     </div>
-                    <div style={{ fontSize: "0.78rem", color: "#aaa", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "0.4rem", wordBreak: "break-all", fontFamily: "monospace" }}>
+                    <div style={{ fontSize: "0.78rem", color: "#aaa", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "0.4rem", wordBreak: "break-all", whiteSpace: "pre-wrap", lineHeight: "1.4", fontFamily: "monospace" }}>
                       {log.comment}
                     </div>
                   </div>

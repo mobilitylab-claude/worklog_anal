@@ -833,8 +833,8 @@ function App() {
             {log.message}
           </div>
           {log.comment && (
-            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', fontSize: '0.8rem', color: '#94a3b8' }}>
-              <strong>기록 내용:</strong> {log.comment}
+            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', fontSize: '0.8rem', color: '#94a3b8', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.4' }}>
+              <strong style={{ color: '#cbd5e1' }}>기록 내용:</strong> {log.comment}
             </div>
           )}
           <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -1187,7 +1187,7 @@ function App() {
                   )}
 
                   <button
-                    onClick={refreshAllStats}
+                    onClick={() => refreshAllStats(false)}
                     disabled={isRefreshingAll}
                     style={{
                       background: isRefreshingAll ? '#334155' : '#2563eb',
@@ -1611,7 +1611,9 @@ function App() {
                                   borderRadius: '5px',
                                   background: hasActiveAnomaly ? 'rgba(239, 68, 68, 0.12)' : 'rgba(15, 23, 42, 0.6)',
                                   border: hasActiveAnomaly ? '1px dashed #ef4444' : hasResolvedHistory ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #334155',
-                                  lineHeight: '1.4'
+                                  lineHeight: '1.4',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word'
                                 }}>
                                   <strong style={{ color: hasActiveAnomaly ? '#fca5a5' : hasResolvedHistory ? '#34d399' : '#94a3b8', marginRight: '4px' }}>
                                     💬 {hasResolvedHistory ? '수정된 코멘트:' : '코멘트:'}

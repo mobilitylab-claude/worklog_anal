@@ -603,7 +603,7 @@ export default function ProjectMonitoring() {
                       <td>{w.author}</td>
                       <td style={{ fontWeight: "bold", color: "#10b981" }}>{w.timeSpent}</td>
                       <td><span style={{ color: "#fbbf24", fontSize: "0.75rem", fontWeight: "bold" }}>{w.taskType}</span></td>
-                      <td>{w.comment}</td>
+                      <td style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{w.comment}</td>
                     </tr>
                   ))}
                 </tbody>
