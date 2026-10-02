@@ -3,22 +3,34 @@ import db from '@/lib/db';
 import { getActiveJiraToken } from '@/lib/jiraAuthServer';
 import { broadcastNotification } from '@/lib/sseClients';
 import { getMonitoringRules, getValidationStandards, validateSingleWorklog } from '@/lib/worklogValidator';
+import { normalizeAuthorName } from '@/lib/nameUtils';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const targetUser = searchParams.get('targetUser');
+    const targetUser = searchParams.get('targetUser') || searchParams.get('user');
 
     const xJiraToken = request?.headers?.get('x-jira-token');
     const JIRA_API_TOKEN = getActiveJiraToken(xJiraToken);
 
     let targets = [];
 
+    // 기존 notification_logs 테이블의 author에 붙어있던 접미사 자동 정제 (동일인 일치율 보장)
+    try {
+      const rawRows = db.prepare("SELECT DISTINCT author FROM notification_logs WHERE author LIKE '%기타모비스온사용자%' OR author LIKE '%협력사%'").all();
+      for (const r of rawRows) {
+        const clean = normalizeAuthorName(r.author);
+        if (clean && clean !== r.author) {
+          db.prepare("UPDATE notification_logs SET author = ? WHERE author = ?").run(clean, r.author);
+        }
+      }
+    } catch (cleanErr) {}
+
     // 개별 팀원 단독 갱신 요청인 경우
     if (targetUser && targetUser.trim()) {
-      targets = [targetUser.trim()];
+      targets = [normalizeAuthorName(targetUser.trim())];
     } else {
       // 전체 팀원 갱신/초기 로딩인 경우
       const row = db.prepare('SELECT value FROM dashboard_config WHERE key = ?').get('noti_target_USER_WORKLOG');
@@ -33,9 +45,9 @@ export async function GET(request) {
       const seenNames = new Set();
 
       for (const raw of rawTargets) {
-        // 공백 이전의 순수 이름만 추출 (예: "탄보련 기타모비스온사용자" -> "탄보련")
-        const name = raw.split(' ')[0];
-        if (!seenNames.has(name)) {
+        // "탄보련 기타모비스온사용자" -> "탄보련", "아라 R&D 협력사" -> "아라" 로 정규화
+        const name = normalizeAuthorName(raw);
+        if (name && !seenNames.has(name)) {
           seenNames.add(name);
           targets.push(name);
         }
@@ -59,14 +71,15 @@ export async function GET(request) {
     const dtToName = {};
 
     for (const name of targets) {
-      const userRow = db.prepare('SELECT dt_account FROM users WHERE name = ?').get(name);
+      const normName = normalizeAuthorName(name);
+      const userRow = db.prepare('SELECT dt_account FROM users WHERE name = ?').get(normName);
       if (userRow && userRow.dt_account) {
         dtAccounts.push(userRow.dt_account);
-        dtToName[userRow.dt_account] = name;
+        dtToName[userRow.dt_account] = normName;
       } else {
         // DB에 없으면 이름 그대로 사용 (폴백)
-        dtAccounts.push(name);
-        dtToName[name] = name;
+        dtAccounts.push(normName);
+        dtToName[normName] = normName;
       }
     }
 
@@ -75,18 +88,44 @@ export async function GET(request) {
     loadingLogs.push(step1);
     console.log(`[Initial Stats] ${step1}`);
 
-    // 한국 시간 기준으로 오늘 및 내일 날짜 추출 (YYYY-MM-DD)
+    // 한국 시간 기준으로 오늘 날짜 추출 (YYYY-MM-DD)
     const today = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
     const todayStr = today.toISOString().split('T')[0];
-    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    // JQL을 이용해 대상자들의 오늘자 워크로그 정밀 검색
-    // JIRA_PROJECT 환경변수가 명시된 경우에만 해당 프로젝트 필터를 적용하고, 없으면 대상자의 오늘자 모든 워크로그를 조회하여 타 프로젝트 오입력도 검출
+    // 요청된 dates 파라미터 및 DB의 미해결(open) 알림들의 날짜를 수집하여 쿼리 대상 날짜 집합 생성
+    const queryDatesSet = new Set([todayStr]);
+    const datesParam = searchParams.get('dates');
+    if (datesParam) {
+      datesParam.split(',').map(d => d.trim()).filter(Boolean).forEach(d => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) queryDatesSet.add(d);
+      });
+    }
+
+    try {
+      let openRows = [];
+      if (targets.length === 1) {
+        openRows = db.prepare("SELECT DISTINCT worklog_date FROM notification_logs WHERE status = 'open' AND author = ?").all(targets[0]);
+      } else {
+        openRows = db.prepare("SELECT DISTINCT worklog_date FROM notification_logs WHERE status = 'open'").all();
+      }
+      openRows.forEach(r => {
+        if (r.worklog_date && /^\d{4}-\d{2}-\d{2}$/.test(r.worklog_date)) {
+          queryDatesSet.add(r.worklog_date);
+        }
+      });
+    } catch (dbErr) {
+      console.warn("[Initial Stats] notification_logs open worklog_date query skipped:", dbErr.message);
+    }
+
+    const queryDates = Array.from(queryDatesSet).sort();
+    const minDate = queryDates[0] || todayStr;
+
+    // JQL을 이용해 대상자들의 조회 대상 날짜(minDate 이후) 워크로그 정밀 검색
+    // JIRA_PROJECT 환경변수가 명시된 경우에만 해당 프로젝트 필터를 적용하고, 없으면 대상자의 모든 워크로그를 조회하여 타 프로젝트 오입력도 검출
     const projectClause = process.env.JIRA_PROJECT ? `${process.env.JIRA_PROJECT} AND ` : "";
     const authorCond = dtAccounts.length > 0 ? `worklogAuthor in (${dtAccounts.map(a => `${a}`).join(', ')}) AND ` : "";
-    const jql = `${projectClause}${authorCond}worklogDate >= ${todayStr}`;
-    const step2 = `[2/4] JQL 실행: ${jql}`;
+    const jql = `${projectClause}${authorCond}worklogDate >= ${minDate}`;
+    const step2 = `[2/4] JQL 실행 (검색 시작일: ${minDate}, 대상 날짜: ${queryDates.join(', ')}): ${jql}`;
     loadingLogs.push(step2);
     console.log(`[Initial Stats] ${step2}`);
 
@@ -188,10 +227,13 @@ export async function GET(request) {
 
       for (const w of wls) {
         const wlAuthorId = w.author?.name || "";
-        const wlAuthorName = w.author?.displayName || "";
-
-        // DT 계정으로 먼저 매핑 시도, 없으면 표시이름으로 시도
-        const matchedTarget = dtToName[wlAuthorId] || targets.find(t => wlAuthorName.toLowerCase().includes(t.toLowerCase()));
+        const wlAuthorName = w.author?.displayName || w.author?.name || "";
+        // DT 계정으로 먼저 매핑 시도, 없으면 표시이름(접미사 제거 후)으로 시도
+        const cleanWlAuthor = normalizeAuthorName(wlAuthorName);
+        const matchedTarget = dtToName[wlAuthorId] || targets.find(t => {
+          const normT = normalizeAuthorName(t);
+          return cleanWlAuthor === normT || cleanWlAuthor.includes(normT) || normT.includes(cleanWlAuthor);
+        });
 
         if (matchedTarget) {
           totalWorklogsMatchedUser++;
@@ -201,23 +243,28 @@ export async function GET(request) {
             const wlDate = new Date(w.started);
             const wlKstDateStr = new Date(wlDate.getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-            if (wlKstDateStr === todayStr) {
-              totalWorklogsMatchedDate++;
+            // 조회 대상 날짜에 포함되는 경우 처리
+            if (queryDatesSet.has(wlKstDateStr)) {
               const hours = (w.timeSpentSeconds || 0) / 3600;
-              stats[matchedTarget] += hours;
-              details[matchedTarget].push({
-                worklogId: w.id || '',
-                issueKey: issueKey,
-                summary: summary,
-                hours: parseFloat(hours.toFixed(1)),
-                comment: typeof w.comment === 'string' ? w.comment : (w.comment?.version ? '' : (w.comment || '')),
-                time: w.started,
-                created: w.created || '',
-                updated: w.updated || '',
-                isEdited: !!(w.updated && w.created && w.updated !== w.created)
-              });
 
-              // ── 실시간 포맷/프로젝트코드/작업유형 검증 수행 ──
+              // 당일(todayStr) 작업시간만 당일 통계에 합산
+              if (wlKstDateStr === todayStr) {
+                totalWorklogsMatchedDate++;
+                stats[matchedTarget] += hours;
+                details[matchedTarget].push({
+                  worklogId: w.id || '',
+                  issueKey: issueKey,
+                  summary: summary,
+                  hours: parseFloat(hours.toFixed(1)),
+                  comment: typeof w.comment === 'string' ? w.comment : (w.comment?.version ? '' : (w.comment || '')),
+                  time: w.started,
+                  created: w.created || '',
+                  updated: w.updated || '',
+                  isEdited: !!(w.updated && w.created && w.updated !== w.created)
+                });
+              }
+
+              // ── 실시간 포맷/프로젝트코드/작업유형 검증 수행 (과거 미해결 날짜 포함) ──
               const anomalyAlerts = validateSingleWorklog({
                 wl: w,
                 issueKey,
@@ -233,10 +280,12 @@ export async function GET(request) {
 
               if (Array.isArray(anomalyAlerts) && anomalyAlerts.length > 0) {
                 anomalyAlerts.forEach(anomalyAlert => {
+                  anomalyAlert.worklogDate = wlKstDateStr;
+                  anomalyAlert.targetDate = wlKstDateStr;
                   if (!seenAlertIds.has(anomalyAlert.id)) {
                     seenAlertIds.add(anomalyAlert.id);
                     alerts.push(anomalyAlert);
-                    console.log(`[Initial Stats] Anomaly detected: [${anomalyAlert.notiType}] ${anomalyAlert.title} - ${anomalyAlert.message} (Issue: ${issueKey}, Author: ${matchedTarget})`);
+                    console.log(`[Initial Stats] Anomaly detected: [${anomalyAlert.notiType}] ${anomalyAlert.title} - ${anomalyAlert.message} (Issue: ${issueKey}, Author: ${matchedTarget}, Date: ${wlKstDateStr})`);
                     // 실시간 접속된 클라이언트들에게 SSE 전송
                     try {
                       broadcastNotification(anomalyAlert);
@@ -252,17 +301,97 @@ export async function GET(request) {
       }
     }
 
+    // ── 알림 DB (notification_logs) 동기화 및 해결 여부 정밀 판정 ──
+    const resolvedAlerts = [];
+    try {
+      const upsertStmt = db.prepare(`
+        INSERT INTO notification_logs (
+          alert_key, noti_type, author, author_id, issue_key, summary, worklog_id, worklog_date, title, message, comment, status, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', CURRENT_TIMESTAMP
+        )
+        ON CONFLICT(alert_key) DO UPDATE SET
+          summary = excluded.summary,
+          title = excluded.title,
+          message = excluded.message,
+          comment = excluded.comment,
+          status = 'open',
+          updated_at = CURRENT_TIMESTAMP
+      `);
+
+      // 1. 이번에 검출된 이상 알림 DB 저장
+      const insertMany = db.transaction((alertsToSave) => {
+        for (const a of alertsToSave) {
+          upsertStmt.run(
+            a.id,
+            a.notiType || 'UNKNOWN',
+            normalizeAuthorName(a.author),
+            a.authorId || '',
+            a.issueKey,
+            a.summary || '',
+            String(a.worklogId || ''),
+            a.worklogDate || todayStr,
+            a.title,
+            a.message,
+            a.comment || ''
+          );
+        }
+      });
+      insertMany(alerts);
+
+      // 2. 이번에 검사한 대상자에 대해, 기존 'open' 알림들을 검사하여 오류가 해결된 건 해결(resolved) 처리!
+      const normTargets = targets.map(t => normalizeAuthorName(t)).filter(Boolean);
+      const placeholdersTargets = normTargets.map(() => '?').join(',');
+      const openDbRows = normTargets.length > 0 ? db.prepare(`
+        SELECT * FROM notification_logs 
+        WHERE status = 'open' 
+          AND author IN (${placeholdersTargets})
+      `).all(...normTargets) : [];
+
+      const resolveStmt = db.prepare(`
+        UPDATE notification_logs 
+        SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `);
+
+      for (const row of openDbRows) {
+        // 이번에 Jira 조회를 수행한 대상 날짜에 포함되거나, minDate 이상인 경우 해결 여부 판정
+        const isDateChecked = queryDatesSet.has(row.worklog_date) || (row.worklog_date && row.worklog_date >= minDate);
+        if (isDateChecked && !seenAlertIds.has(row.alert_key)) {
+          resolveStmt.run(row.id);
+          resolvedAlerts.push({
+            id: `resolved-noti-${row.alert_key}-${Date.now()}`,
+            originalAlertKey: row.alert_key,
+            worklogId: row.worklog_id,
+            worklogDate: row.worklog_date,
+            author: row.author,
+            issueKey: row.issue_key,
+            notiType: 'WORKLOG_RESOLVED',
+            title: `✨ [수정 완료] ${row.author} 작업기록 정상 반영`,
+            message: `[${row.issue_key}] (${row.worklog_date}) ${row.title} 항목이 올바르게 수정되어 오류가 해결되었습니다.`,
+            resolved: true,
+            resolvedAt: new Date().toLocaleTimeString()
+          });
+        }
+      }
+    } catch (dbSyncErr) {
+      console.error("[Initial Stats] notification_logs DB sync error:", dbSyncErr);
+    }
+
     console.log(`[Initial Stats] Total Issues: ${issues.length}`);
     console.log(`[Initial Stats] Total Worklogs Fetched: ${totalWorklogsFetched}`);
     console.log(`[Initial Stats] Worklogs Matched User: ${totalWorklogsMatchedUser}`);
     console.log(`[Initial Stats] Worklogs Matched Date (Today): ${totalWorklogsMatchedDate}`);
-    console.log(`[Initial Stats] Anomalies/Alerts Found: ${alerts.length}`);
+    console.log(`[Initial Stats] Anomalies/Alerts Found: ${alerts.length}, Resolved: ${resolvedAlerts.length}`);
 
-    const step3_5 = `[3.5/4] 분석 결과: 작업기록 총 ${totalWorklogsFetched}개 중 대상자 매칭 ${totalWorklogsMatchedUser}개, 오늘 날짜 매칭 ${totalWorklogsMatchedDate}개`;
+    const step3_5 = `[3.5/4] 분석 결과: 작업기록 총 ${totalWorklogsFetched}개 중 대상자 매칭 ${totalWorklogsMatchedUser}개, 당일 매칭 ${totalWorklogsMatchedDate}개 (이상: ${alerts.length}건, 해결됨: ${resolvedAlerts.length}건)`;
     loadingLogs.push(step3_5);
 
     if (alerts.length > 0) {
-      loadingLogs.push(`⚠️ [이상 기록 감지] 당일 작업기록 중 포맷 오류 및 미등록 코드/유형 ${alerts.length}건이 발견되었습니다.`);
+      loadingLogs.push(`⚠️ [이상 기록 감지] 작업기록 중 포맷 오류 및 미등록 코드/유형 ${alerts.length}건이 발견되었습니다.`);
+    }
+    if (resolvedAlerts.length > 0) {
+      loadingLogs.push(`✨ [오류 해결 확인] 정상 수정된 작업기록 ${resolvedAlerts.length}건이 확인되어 해결 처리되었습니다.`);
     }
 
     // 포맷팅 (소수점 1자리)
@@ -271,7 +400,7 @@ export async function GET(request) {
       formattedStats[name] = parseFloat(val.toFixed(1));
     }
 
-    const step4 = `[4/4] 작업기록 분석 완료 (대상자: ${Object.keys(formattedStats).length}명, 이상 항목: ${alerts.length}건)`;
+    const step4 = `[4/4] 작업기록 분석 완료 (대상자: ${Object.keys(formattedStats).length}명, 이상 항목: ${alerts.length}건, 해결: ${resolvedAlerts.length}건)`;
     loadingLogs.push(step4);
     console.log(`[Initial Stats] ${step4}`);
 
@@ -284,8 +413,16 @@ export async function GET(request) {
       'Expires': '0'
     };
 
-    console.log(`[Initial Stats] Returning stats for ${Object.keys(formattedStats).length} users. Details keys: ${Object.keys(details).length}. Alerts count: ${alerts.length}`);
-    return Response.json({ success: true, stats: formattedStats, details, alerts, loadingLogs }, { headers });
+    console.log(`[Initial Stats] Returning stats for ${Object.keys(formattedStats).length} users. Alerts: ${alerts.length}, Resolved: ${resolvedAlerts.length}, Checked Dates: ${queryDates.join(',')}`);
+    return Response.json({ 
+      success: true, 
+      stats: formattedStats, 
+      details, 
+      alerts, 
+      resolvedAlerts,
+      checkedDates: queryDates, 
+      loadingLogs 
+    }, { headers });
   } catch (e) {
     console.error("Initial stats error:", e);
     return Response.json({ success: false, error: e.message }, {

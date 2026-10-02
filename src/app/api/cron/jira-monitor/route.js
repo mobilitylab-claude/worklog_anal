@@ -3,6 +3,7 @@ import { broadcastNotification, sseClients } from '@/lib/sseClients';
 import db from '@/lib/db';
 import { validateSingleWorklog } from '@/lib/worklogValidator';
 import { getActiveJiraToken } from '@/lib/jiraAuthServer';
+import { normalizeAuthorName } from '@/lib/nameUtils';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,13 +57,16 @@ export async function GET() {
   // 대상 필터링 함수
   const isTargetMatched = (targetStr, checkValues) => {
     if (!targetStr) return true; // 빈 값이면 전체 대상
-    const targets = targetStr.toLowerCase().split(',').map(s => s.trim()).filter(s => s);
+    const targets = targetStr.toLowerCase().split(',').map(s => normalizeAuthorName(s).trim()).filter(Boolean);
     if (targets.length === 0) return true;
     
-    // checkValues 배열 중 하나라도 targets 문자열을 포함하면 통과
+    // checkValues 배열 중 하나라도 targets 문자열을 포함하거나 일치하면 통과
     return checkValues.some(val => {
-      const lowerVal = String(val).toLowerCase();
-      return targets.some(t => lowerVal.includes(t));
+      if (!val) return false;
+      const rawVal = String(val);
+      const cleanVal = normalizeAuthorName(rawVal).toLowerCase();
+      const lowerVal = rawVal.toLowerCase();
+      return targets.some(t => cleanVal.includes(t) || t.includes(cleanVal) || lowerVal.includes(t));
     });
   };
 
@@ -127,9 +131,9 @@ export async function GET() {
       const seenNames = new Set();
       
       for (const raw of rawTargets) {
-        // 공백 이전의 순수 이름만 추출 (예: "탄보련 기타모비스온사용자" -> "탄보련")
-        const name = raw.split(' ')[0];
-        if (!seenNames.has(name)) {
+        // "탄보련 기타모비스온사용자" -> "탄보련", "아라 R&D 협력사" -> "아라" 로 정규화
+        const name = normalizeAuthorName(raw);
+        if (name && !seenNames.has(name)) {
           seenNames.add(name);
           targets.push(name);
         }
@@ -228,10 +232,12 @@ export async function GET() {
           const { issueKey, wls, summary } = result;
           for (const w of wls) {
             const wlAuthorId = w.author?.name || "";
-            const wlAuthorName = w.author?.displayName || "";
-            
-            // DT 계정으로 먼저 매핑 시도, 없으면 표시이름으로 시도
-            const matchedTarget = dtToName[wlAuthorId] || targets.find(t => wlAuthorName.toLowerCase().includes(t.toLowerCase()));
+            const wlAuthorName = w.author?.displayName || w.author?.name || "";
+            const cleanWlAuthor = normalizeAuthorName(wlAuthorName);
+            const matchedTarget = dtToName[wlAuthorId] || targets.find(t => {
+              const normT = normalizeAuthorName(t);
+              return cleanWlAuthor === normT || cleanWlAuthor.includes(normT) || normT.includes(cleanWlAuthor);
+            });
             
             if (matchedTarget) {
               // 한국 시간 기준으로 날짜 비교
@@ -327,7 +333,8 @@ export async function GET() {
         continue;
       }
 
-      const author = wl.author?.displayName || wl.author?.name || 'Unknown';
+      const rawAuthor = wl.author?.displayName || wl.author?.name || 'Unknown';
+      const author = normalizeAuthorName(rawAuthor) || rawAuthor;
       const authorId = wl.author?.name || 'Unknown';
       let commentStr = '';
       if (wl.comment) {
@@ -355,8 +362,63 @@ export async function GET() {
       if (Array.isArray(detectedAlerts) && detectedAlerts.length > 0) {
         anomalyFound = true;
         detectedAlerts.forEach(alertItem => {
+          try {
+            db.prepare(`
+              INSERT INTO notification_logs (
+                alert_key, noti_type, author, author_id, issue_key, summary, worklog_id, worklog_date, title, message, comment, status, updated_at
+              ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', CURRENT_TIMESTAMP
+              )
+              ON CONFLICT(alert_key) DO UPDATE SET
+                summary = excluded.summary,
+                title = excluded.title,
+                message = excluded.message,
+                comment = excluded.comment,
+                status = 'open',
+                updated_at = CURRENT_TIMESTAMP
+            `).run(
+              alertItem.id,
+              alertItem.notiType || 'UNKNOWN',
+              normalizeAuthorName(alertItem.author),
+              authorId || '',
+              alertItem.issueKey,
+              alertItem.summary || '',
+              String(alertItem.worklogId || ''),
+              alertItem.worklogDate || todayStr,
+              alertItem.title,
+              alertItem.message,
+              alertItem.comment || ''
+            );
+          } catch (e) {
+            console.error("DB insert error for alertItem:", e.message);
+          }
           broadcastNotification(alertItem);
         });
+      } else {
+        // 이상이 감지되지 않은 정상 워크로그인 경우:
+        // 기존에 이 워크로그 ID로 등록되었던 미해결(open) 알림이 있다면 즉시 'resolved' 처리!
+        try {
+          const resRows = db.prepare("SELECT id, alert_key, issue_key, author, worklog_date, title FROM notification_logs WHERE worklog_id = ? AND status = 'open'").all(String(wlId));
+          for (const resRow of resRows) {
+            db.prepare("UPDATE notification_logs SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(resRow.id);
+            console.log(`[Jira Monitor] Worklog ${wlId} anomaly resolved automatically! (${resRow.alert_key})`);
+            broadcastNotification({
+              id: `resolved-noti-${resRow.alert_key}-${Date.now()}`,
+              originalAlertKey: resRow.alert_key,
+              worklogId: String(wlId),
+              worklogDate: resRow.worklog_date,
+              author: resRow.author,
+              issueKey: resRow.issue_key,
+              notiType: 'WORKLOG_RESOLVED',
+              title: `✨ [수정 완료] ${resRow.author} 작업기록 정상 반영`,
+              message: `[${resRow.issue_key}] (${resRow.worklog_date}) ${resRow.title} 항목이 올바르게 수정되어 오류가 해결되었습니다.`,
+              resolved: true,
+              resolvedAt: new Date().toLocaleTimeString()
+            });
+          }
+        } catch (rErr) {
+          console.error("Auto resolve error in cron/jira-monitor:", rErr);
+        }
       }
 
       // 1. 일반 사용자 작업기록 업데이트 현황 (이상 항목이 없을 때만 발송)

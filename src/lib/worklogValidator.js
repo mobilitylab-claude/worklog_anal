@@ -1,3 +1,5 @@
+import { normalizeAuthorName } from './nameUtils.js';
+
 let db = null;
 try {
   const mod = await import('./db.js');
@@ -88,16 +90,19 @@ export function getValidationStandards() {
 
 /**
  * 대상 필터링 함수: targetStr이 비어있으면 전체 대상, 설정되어 있으면 checkValues 중 포함 여부 검사
+ * ("기타모비스온사용자", "R&D 협력사" 등의 접미사는 정규화하여 동일인으로 처리)
  */
 export const isTargetMatched = (targetStr, checkValues) => {
   if (!targetStr) return true;
-  const targets = targetStr.toLowerCase().split(',').map(s => s.trim()).filter(s => s);
+  const targets = targetStr.toLowerCase().split(',').map(s => normalizeAuthorName(s).trim()).filter(Boolean);
   if (targets.length === 0) return true;
 
   return checkValues.some(val => {
     if (!val) return false;
-    const lowerVal = String(val).toLowerCase();
-    return targets.some(t => lowerVal.includes(t));
+    const rawVal = String(val);
+    const cleanVal = normalizeAuthorName(rawVal).toLowerCase();
+    const lowerVal = rawVal.toLowerCase();
+    return targets.some(t => cleanVal.includes(t) || t.includes(cleanVal) || lowerVal.includes(t));
   });
 };
 
@@ -116,6 +121,7 @@ export function validateSingleWorklog({
   rules,
   jiraHost = ''
 }) {
+  const cleanAuthor = normalizeAuthorName(author) || author || 'Unknown';
   const prjPrefix = (issueKey || '').split('-')[0].toLowerCase();
   const cleanHost = (jiraHost || process.env.JIRA_HOST || 'https://jira.yourcompany.com').replace(/\/$/, '');
   const url = `${cleanHost}/browse/${issueKey}`;
@@ -165,6 +171,19 @@ export function validateSingleWorklog({
   const checkTargets = [author, authorId, issueKey];
   const detectedAlerts = [];
 
+  // 한국 시간 기준 워크로그 일자 추출 (YYYY-MM-DD)
+  let worklogDate = '';
+  if (wl.started) {
+    try {
+      const wlDate = new Date(wl.started);
+      worklogDate = new Date(wlDate.getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } catch (e) {
+      worklogDate = new Date(new Date().getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+    }
+  } else {
+    worklogDate = new Date(new Date().getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+  }
+
   // 1. 미등록 프로젝트 또는 완료된 프로젝트 확인
   const isUnregistered = !validProjects.includes(parsedProjectCode) && !completedProjects.includes(parsedProjectCode);
   const isCompleted = completedProjects.includes(parsedProjectCode);
@@ -175,6 +194,8 @@ export function validateSingleWorklog({
       detectedAlerts.push({
         id: `alert-proj-${wl.id || issueKey}-${parsedProjectCode}`,
         worklogId: wl.id || '',
+        worklogDate,
+        targetDate: worklogDate,
         notiType: 'INVALID_PROJECT',
         title: problemType + ' 코드 사용',
         message: `${problemType}(${parsedProjectCode.toUpperCase()})에 작업기록이 등록되었습니다.`,
@@ -183,7 +204,7 @@ export function validateSingleWorklog({
         issueKey,
         summary: summary || '',
         url,
-        author,
+        author: cleanAuthor,
         time: new Date().toLocaleTimeString(),
         receiveTime: new Date().toLocaleTimeString(),
         isRead: false
@@ -216,6 +237,8 @@ export function validateSingleWorklog({
         detectedAlerts.push({
           id: `alert-type-${wl.id || issueKey}-${parsedWorkType || 'invalid'}`,
           worklogId: wl.id || '',
+          worklogDate,
+          targetDate: worklogDate,
           notiType: 'INVALID_TASK_TYPE',
           title,
           message,
@@ -224,7 +247,7 @@ export function validateSingleWorklog({
           issueKey,
           summary: summary || '',
           url,
-          author,
+          author: cleanAuthor,
           time: new Date().toLocaleTimeString(),
           receiveTime: new Date().toLocaleTimeString(),
           isRead: false

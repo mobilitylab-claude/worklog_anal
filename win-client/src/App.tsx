@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
+export function normalizeAuthorName(name: string | null | undefined): string {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .replace(/\s*[\(\[\{]?(?:기타모비스온사용자|R&D\s*협력사|협력사)[\)\]\}]?\s*/gi, '')
+    .trim();
+}
+
 type ViewMode = 'dashboard' | 'monitor' | 'tunnel';
 
 function App() {
@@ -115,21 +122,69 @@ function App() {
     }
   };
 
-  // ── 수동 갱신 시 alert 목록을 동기화하여 해결된 오류는 'resolved' 처리하고 새 오류/수정 히스토리를 반영하는 함수 ──
-  const syncAlertLogs = (targetUser: string | null, rawAlerts: any[]) => {
+  // ── 클라이언트에 현재 존재하는 미해결 알림들의 오류 발생 일자(worklogDate) 목록 추출 ──
+  const getPendingAlertDates = (targetUser?: string | null) => {
+    try {
+      const dates = new Set<string>();
+      const cleanTarget = normalizeAuthorName(targetUser);
+      logs.forEach((l: any) => {
+        if (!l.resolved && ['INVALID_PROJECT', 'INVALID_TASK_TYPE'].includes(l.notiType)) {
+          const cleanAuthor = normalizeAuthorName(l.author);
+          if (!cleanTarget || cleanAuthor === cleanTarget || cleanAuthor.includes(cleanTarget) || cleanTarget.includes(cleanAuthor)) {
+            const d = l.worklogDate || l.targetDate;
+            if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+              dates.add(d);
+            }
+          }
+        }
+      });
+      return Array.from(dates);
+    } catch (e) {
+      return [];
+    }
+  };
+
+  // ── 수동/자동 갱신 시 alert 목록을 동기화하여 해결된 오류는 'resolved' 처리하고 새 오류/수정 히스토리를 반영하는 함수 ──
+  const syncAlertLogs = (targetUser: string | null, rawAlerts: any[], checkedDates?: string[], serverResolvedAlerts?: any[]) => {
     const currentAlerts = Array.isArray(rawAlerts) ? rawAlerts : [];
     const currentAlertMap = new Map<string, any>(currentAlerts.map((a: any) => [String(a.id), a]));
+    const cleanTarget = normalizeAuthorName(targetUser);
     const isTarget = (author: string) => {
-      if (!targetUser) return true;
-      return author === targetUser || author.includes(targetUser) || targetUser.includes(author);
+      if (!cleanTarget) return true;
+      const cleanAuthor = normalizeAuthorName(author);
+      return cleanAuthor === cleanTarget || cleanAuthor.includes(cleanTarget) || cleanTarget.includes(cleanAuthor);
     };
+
+    // 한국 시간 오늘 날짜
+    const todayKst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const validCheckedDates = Array.isArray(checkedDates) && checkedDates.length > 0 
+      ? new Set(checkedDates) 
+      : new Set([todayKst]);
+
+    // 서버가 직접 해결 판정한 알림 맵
+    const serverResolvedMap = new Map<string, any>();
+    if (Array.isArray(serverResolvedAlerts)) {
+      serverResolvedAlerts.forEach((r: any) => {
+        if (r.originalAlertKey) serverResolvedMap.set(String(r.originalAlertKey), r);
+        if (r.id) serverResolvedMap.set(String(r.id), r);
+      });
+    }
 
     setLogs(prev => {
       const resolvedNotis: any[] = [];
       const updatedPrev = prev.map((l: any) => {
-        // 대상 팀원의 미해결 비정상 alert인데 이번 응답에 없는 경우 -> Jira에서 정상 수정되었거나 삭제됨!
+        // 대상 팀원의 미해결 비정상 alert 검사
         if (!l.resolved && ['INVALID_PROJECT', 'INVALID_TASK_TYPE'].includes(l.notiType) && isTarget(l.author)) {
-          if (!currentAlertMap.has(String(l.id))) {
+          // 핵심: 해당 오류의 발생 일자(worklogDate)가 이번 검사 날짜(validCheckedDates)에 포함된 경우에만 해결 여부를 검증!
+          // 만약 검사 대상 날짜가 아니면, 아직 검사하지 않았으므로 멋대로 해결 처리하지 않고 유지!
+          const logDate = l.worklogDate || l.targetDate || '';
+          const isDateChecked = !logDate || validCheckedDates.has(logDate);
+
+          const isServerResolved = serverResolvedMap.has(String(l.id));
+          const isMissingFromCheckedResponse = isDateChecked && !currentAlertMap.has(String(l.id));
+
+          if (isServerResolved || isMissingFromCheckedResponse) {
+            const serverInfo = serverResolvedMap.get(String(l.id));
             resolvedNotis.push({
               id: `resolved-noti-${l.id}-${Date.now()}`,
               receiveTime: new Date().toLocaleTimeString(),
@@ -137,10 +192,11 @@ function App() {
               type: 'success',
               notiType: 'WORKLOG_RESOLVED',
               title: `✨ [수정 완료] ${l.author} 작업기록 정상 반영`,
-              message: `[${l.issueKey}] ${l.title} 항목이 올바른 포맷/내용으로 수정되어 오류가 해소되었습니다.`,
+              message: serverInfo?.message || `[${l.issueKey}] ${logDate ? `(${logDate}) ` : ''}${l.title} 항목이 올바른 포맷/내용으로 수정되어 오류가 해소되었습니다.`,
               issueKey: l.issueKey,
               author: l.author,
               worklogId: l.worklogId,
+              worklogDate: logDate,
               previousTitle: l.title,
               previousMessage: l.message,
               previousComment: l.comment
@@ -200,16 +256,19 @@ function App() {
     const targetUrl = (serverIp || 'http://localhost:3000').replace(/\/$/, '');
 
     try {
-      const res = await fetch(`${targetUrl}/api/notifications/initial-stats`, { cache: 'no-store' });
+      const pendingDates = getPendingAlertDates(null);
+      const queryParam = pendingDates.length > 0 ? `?dates=${pendingDates.join(',')}` : '';
+      const res = await fetch(`${targetUrl}/api/notifications/initial-stats${queryParam}`, { cache: 'no-store' });
       const resData = await res.json();
       if (resData.success) {
         if (resData.stats) setUserStats(resData.stats);
         if (resData.details) setUserDetails(resData.details);
 
-        // ── alert 목록 동기화 (해결된 오류는 resolved 처리 및 수정 히스토리 생성) ──
-        syncAlertLogs(null, resData.alerts || []);
+        // ── alert 목록 동기화 (오류 발생 일자를 기준으로 실제 재검증된 날짜만 해결 여부 반영) ──
+        syncAlertLogs(null, resData.alerts || [], resData.checkedDates || [], resData.resolvedAlerts || []);
 
         const alertSuffix = resData.alerts?.length ? ` (⚠️ 이상 항목 ${resData.alerts.length}건 감지)` : '';
+        const resolvedSuffix = resData.resolvedAlerts?.length ? ` (✨ 수정 완료 ${resData.resolvedAlerts.length}건 반영)` : '';
         const titleText = isAuto ? '⏱️ 전체 팀원 작업기록 자동 갱신 완료' : '🔄 전체 팀원 작업기록 갱신 완료';
         setLogs(prev => [{
           id: `${isAuto ? 'auto' : 'manual'}-all-${Date.now()}`,
@@ -217,7 +276,7 @@ function App() {
           isRead: false,
           type: resData.alerts?.length ? 'warning' : 'info',
           title: titleText,
-          message: `총 ${Object.keys(resData.stats || {}).length}명의 당일 작업기록이 최신화되었습니다.${alertSuffix}`
+          message: `총 ${Object.keys(resData.stats || {}).length}명의 당일 작업기록이 최신화되었습니다.${alertSuffix}${resolvedSuffix}`
         }, ...prev]);
       } else if (!isAuto) {
         alert("전체 작업기록 갱신 실패: " + (resData.error || "알 수 없는 오류"));
@@ -244,7 +303,9 @@ function App() {
     const targetUrl = serverIp.replace(/\/$/, '');
 
     try {
-      const res = await fetch(`${targetUrl}/api/notifications/initial-stats?targetUser=${encodeURIComponent(userName)}`, { cache: 'no-store' });
+      const pendingDates = getPendingAlertDates(userName);
+      const datesParam = pendingDates.length > 0 ? `&dates=${pendingDates.join(',')}` : '';
+      const res = await fetch(`${targetUrl}/api/notifications/initial-stats?targetUser=${encodeURIComponent(userName)}${datesParam}`, { cache: 'no-store' });
       const resData = await res.json();
       if (resData.success) {
         if (resData.stats && resData.stats[userName] !== undefined) {
@@ -260,19 +321,20 @@ function App() {
           }));
         }
 
-        // ── alert 목록 동기화 (해당 팀원의 해결된 오류는 resolved 처리 및 수정 히스토리 생성) ──
-        syncAlertLogs(userName, resData.alerts || []);
+        // ── alert 목록 동기화 (오류 발생 일자를 기준으로 실제 재검증된 날짜만 해결 여부 반영) ──
+        syncAlertLogs(userName, resData.alerts || [], resData.checkedDates || [], resData.resolvedAlerts || []);
 
         const count = resData.details?.[userName]?.length || 0;
         const hrs = resData.stats?.[userName] || 0;
         const alertSuffix = resData.alerts?.length ? ` (⚠️ 이상 항목 ${resData.alerts.length}건)` : '';
+        const resolvedSuffix = resData.resolvedAlerts?.length ? ` (✨ 수정 완료 ${resData.resolvedAlerts.length}건)` : '';
         setLogs(prev => [{
           id: `manual-user-${Date.now()}`,
           receiveTime: new Date().toLocaleTimeString(),
           isRead: false,
           type: resData.alerts?.length ? 'warning' : 'info',
           title: `🔄 ${userName} 님의 작업기록 갱신`,
-          message: `당일 총 ${hrs}h (${count}건의 이슈) 최신 반영 완료${alertSuffix}`
+          message: `당일 총 ${hrs}h (${count}건의 이슈) 최신 반영 완료${alertSuffix}${resolvedSuffix}`
         }, ...prev]);
       }
     } catch (err: any) {
@@ -487,21 +549,17 @@ function App() {
               })
               .catch(() => {});
 
-            fetch(`${targetUrl}/api/notifications/initial-stats`)
+            const pendingDates = getPendingAlertDates(null);
+            const queryParam = pendingDates.length > 0 ? `?dates=${pendingDates.join(',')}` : '';
+            fetch(`${targetUrl}/api/notifications/initial-stats${queryParam}`)
               .then(res => res.json())
               .then(resData => {
                 if (resData.success) {
                   if (resData.stats) setUserStats(resData.stats)
                   if (resData.details) setUserDetails(resData.details)
                   
-                  // 초기 로딩 시 감지된 비정상 작업기록 목록 반영
-                  if (Array.isArray(resData.alerts) && resData.alerts.length > 0) {
-                    setLogs(prev => {
-                      const existingIds = new Set(prev.map((l: any) => l.id));
-                      const freshAlerts = resData.alerts.filter((a: any) => !existingIds.has(a.id));
-                      return freshAlerts.length > 0 ? [...freshAlerts, ...prev] : prev;
-                    });
-                  }
+                  // 초기 로딩 시 alert 목록 정밀 동기화 (오류 발생 일자 기준)
+                  syncAlertLogs(null, resData.alerts || [], resData.checkedDates || [], resData.resolvedAlerts || []);
 
                   if (resData.loadingLogs) {
                     const logsToAdd = resData.loadingLogs.map((msg: string, idx: number) => ({
@@ -709,7 +767,9 @@ function App() {
       if (!log || !['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType)) {
         return false;
       }
-      const authorMatches = log.author && (log.author === userName || log.author.includes(userName) || userName.includes(log.author));
+      const cleanUser = normalizeAuthorName(userName);
+      const cleanAuthor = normalizeAuthorName(log.author);
+      const authorMatches = cleanAuthor && (cleanAuthor === cleanUser || cleanAuthor.includes(cleanUser) || cleanUser.includes(cleanAuthor));
       if (!authorMatches) return false;
 
       // worklogId가 일치하는 경우 최우선 매칭
@@ -1030,6 +1090,7 @@ function App() {
                   { label: '🏠 홈 대시보드', path: '/' },
                   { label: '📈 프로젝트 입체 모니터링', path: '/project-monitoring' },
                   { label: '⏱️ 워크로그 분석기', path: '/worklog' },
+                  { label: '📋 인사평가 및 알람통계', path: '/notifications' },
                   { label: '📑 월간 리포트', path: '/monthly-reports' },
                   { label: '👥 팀원 관리', path: '/user-management' },
                   { label: '⚙️ 기준 관리', path: '/standard-management' },
@@ -1237,12 +1298,12 @@ function App() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {Array.from(new Set(alertLogs.filter(l => !l.isRead).map(l => l.author).filter(Boolean))).map(authorName => (
+                    {Array.from(new Set(alertLogs.filter(l => !l.isRead).map(l => normalizeAuthorName(l.author)).filter(Boolean))).map(authorName => (
                       <button
                         key={authorName}
                         onClick={() => handleSelectUser(authorName)}
                         style={{
-                          background: selectedUser === authorName ? '#ef4444' : 'rgba(239, 68, 68, 0.35)',
+                          background: normalizeAuthorName(selectedUser) === authorName ? '#ef4444' : 'rgba(239, 68, 68, 0.35)',
                           color: '#ffffff',
                           border: '1px solid #ef4444',
                           borderRadius: '6px',
@@ -1267,11 +1328,12 @@ function App() {
               {Object.keys(userStats).length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))', gap: '12px' }}>
                   {Object.entries(userStats).map(([name, hours]) => {
-                    const userAlerts = logs.filter(log => 
-                      !log.resolved &&
-                      ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType) &&
-                      (log.author === name || log.author?.includes(name) || name.includes(log.author || ''))
-                    );
+                    const cleanName = normalizeAuthorName(name);
+                    const userAlerts = logs.filter(log => {
+                      if (log.resolved || !['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(log.notiType)) return false;
+                      const cleanLogAuthor = normalizeAuthorName(log.author);
+                      return cleanLogAuthor === cleanName || cleanLogAuthor.includes(cleanName) || cleanName.includes(cleanLogAuthor);
+                    });
                     const hasUnreadAlert = userAlerts.some(log => !log.isRead);
                     const alertCount = userAlerts.length;
 
@@ -1356,15 +1418,17 @@ function App() {
 
               {/* 선택된 작업자 상세 모달/패널 */}
               {selectedUser && (() => {
-                const userActiveAlerts = logs.filter(l => 
-                  !l.resolved &&
-                  ['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(l.notiType) &&
-                  (l.author === selectedUser || l.author?.includes(selectedUser) || selectedUser.includes(l.author || ''))
-                );
-                const userResolvedAlerts = logs.filter(l => 
-                  (l.resolved || l.notiType === 'WORKLOG_RESOLVED') &&
-                  (l.author === selectedUser || l.author?.includes(selectedUser) || selectedUser.includes(l.author || ''))
-                );
+                const cleanSelectedUser = normalizeAuthorName(selectedUser);
+                const userActiveAlerts = logs.filter(l => {
+                  if (l.resolved || !['INVALID_PROJECT', 'INVALID_TASK_TYPE', 'TIME_EXCEEDED'].includes(l.notiType)) return false;
+                  const cleanLogAuthor = normalizeAuthorName(l.author);
+                  return cleanLogAuthor === cleanSelectedUser || cleanLogAuthor.includes(cleanSelectedUser) || cleanSelectedUser.includes(cleanLogAuthor);
+                });
+                const userResolvedAlerts = logs.filter(l => {
+                  if (!l.resolved && l.notiType !== 'WORKLOG_RESOLVED') return false;
+                  const cleanLogAuthor = normalizeAuthorName(l.author);
+                  return cleanLogAuthor === cleanSelectedUser || cleanLogAuthor.includes(cleanSelectedUser) || cleanSelectedUser.includes(cleanLogAuthor);
+                });
 
                 return (
                   <div style={{ 
@@ -1460,14 +1524,17 @@ function App() {
                           const hasActiveAnomaly = activeAnomalies.length > 0;
 
                           // 이전에 이 항목에 오류가 발생했으나 수정되어 해결된 히스토리 매칭
-                          const resolvedAnomalies = logs.filter(l => 
-                            (l.resolved || l.notiType === 'WORKLOG_RESOLVED') &&
-                            (l.author === selectedUser || l.author?.includes(selectedUser) || selectedUser.includes(l.author || '')) &&
-                            (
+                          const cleanSelUser = normalizeAuthorName(selectedUser);
+                          const resolvedAnomalies = logs.filter(l => {
+                            if (!l.resolved && l.notiType !== 'WORKLOG_RESOLVED') return false;
+                            const cleanLogAuthor = normalizeAuthorName(l.author);
+                            const authorMatch = cleanLogAuthor === cleanSelUser || cleanLogAuthor.includes(cleanSelUser) || cleanSelUser.includes(cleanLogAuthor);
+                            if (!authorMatch) return false;
+                            return (
                               (item.worklogId && l.worklogId && String(item.worklogId) === String(l.worklogId)) ||
                               (l.issueKey && item.issueKey && l.issueKey === item.issueKey)
-                            )
-                          );
+                            );
+                          });
                           const hasResolvedHistory = !hasActiveAnomaly && (resolvedAnomalies.length > 0 || item.isEdited);
 
                           const jiraUrl = `${serverIp.replace(/\/$/, '')}/browse/${item.issueKey}`;

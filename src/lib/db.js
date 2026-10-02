@@ -281,5 +281,34 @@ db.exec(`
   )
 `);
 
+// ── 알림 이력 및 통계 보관함 테이블 ───────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS notification_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_key TEXT UNIQUE,
+    noti_type TEXT NOT NULL,
+    author TEXT NOT NULL,
+    author_id TEXT,
+    issue_key TEXT NOT NULL,
+    summary TEXT,
+    worklog_id TEXT,
+    worklog_date TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    comment TEXT,
+    status TEXT DEFAULT 'open',
+    resolved_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_noti_logs_author ON notification_logs(author);
+  CREATE INDEX IF NOT EXISTS idx_noti_logs_worklog_date ON notification_logs(worklog_date);
+  CREATE INDEX IF NOT EXISTS idx_noti_logs_status ON notification_logs(status);
+  CREATE INDEX IF NOT EXISTS idx_noti_logs_created_at ON notification_logs(created_at);
+`);
+
 export default db;
 
