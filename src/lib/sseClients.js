@@ -1,4 +1,4 @@
-import db from '@/lib/db';
+import db from './db.js';
 
 export const sseClients = new Set();
 let pollingInterval = null;

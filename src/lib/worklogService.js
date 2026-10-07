@@ -1,4 +1,5 @@
 import { fetchJiraSearch } from "./jiraClient.js";
+import { getActiveJiraToken } from "./jiraAuthServer.js";
 
 const extractTextFromADF = (node) => {
   if (typeof node === "string") return node;
@@ -69,7 +70,7 @@ export async function getWorklogs({
   debugLog = []
 }) {
   const JIRA_DOMAIN = domain || process.env.JIRA_DOMAIN || process.env.JIRA_HOST;
-  const JIRA_API_TOKEN = apiToken || process.env.JIRA_API_TOKEN;
+  const JIRA_API_TOKEN = apiToken || getActiveJiraToken();
 
   if (!JIRA_DOMAIN || !JIRA_API_TOKEN) {
     throw new Error("Jira 설정이 누락되었습니다 (Domain/Token)");

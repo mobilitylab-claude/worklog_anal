@@ -1,5 +1,5 @@
-import db from '@/lib/db';
-import { decryptText } from '@/lib/crypto';
+import db from './db.js';
+import { decryptText } from './crypto.js';
 
 /**
  * 현재 활성화된 Jira 계정의 복호화된 PAT 토큰을 가져옵니다.

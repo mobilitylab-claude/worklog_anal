@@ -1,6 +1,25 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import db from '@/lib/db';
 import { encryptText, decryptText, maskToken } from '@/lib/crypto';
+
+function syncEnvToken(token) {
+  try {
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(envPath) && token) {
+      let content = fs.readFileSync(envPath, 'utf8');
+      if (content.includes('JIRA_API_TOKEN=')) {
+        content = content.replace(/JIRA_API_TOKEN=.*/, `JIRA_API_TOKEN=${token}`);
+      } else {
+        content += `\nJIRA_API_TOKEN=${token}\n`;
+      }
+      fs.writeFileSync(envPath, content, 'utf8');
+    }
+  } catch (e) {
+    console.warn('syncEnvToken failed:', e.message);
+  }
+}
 
 // GET: DB에 저장된 Jira 계정 목록 및 활성 계정 조회
 export async function GET(request) {
@@ -114,6 +133,13 @@ export async function PUT(request) {
         db.prepare('UPDATE jira_accounts SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(targetId);
       });
       tx(id);
+
+      // .env 파일 토큰 동기화
+      const targetRow = db.prepare('SELECT encrypted_token FROM jira_accounts WHERE id = ?').get(id);
+      if (targetRow && targetRow.encrypted_token) {
+        syncEnvToken(decryptText(targetRow.encrypted_token));
+      }
+
       return NextResponse.json({ success: true, activeId: id });
     }
 
@@ -123,6 +149,12 @@ export async function PUT(request) {
       }
       const enc = encryptText(token);
       db.prepare('UPDATE jira_accounts SET encrypted_token = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(enc, id);
+      
+      const row = db.prepare('SELECT is_active FROM jira_accounts WHERE id = ?').get(id);
+      if (row && row.is_active === 1) {
+        syncEnvToken(token);
+      }
+
       return NextResponse.json({ success: true });
     }
 

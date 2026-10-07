@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { runWorklogReports } from '@/lib/cronService';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const searchParams = request.nextUrl.searchParams;

@@ -1,5 +1,6 @@
 import db from './db.js';
 import { getWorklogs } from './worklogService.js';
+import { getActiveJiraToken } from './jiraAuthServer.js';
 
 export const isLastDayOfMonth = (date) => {
   const d = new Date(date);
@@ -112,6 +113,7 @@ export async function runWorklogReports({ forceDate = null, forceType = null } =
     let finalJql = `${projectClause}${authorCondCron} AND worklogDate >= ${rStartDate}`;
 
     try {
+      const activeToken = getActiveJiraToken();
       const debugLog = [];
       const rawLogs = await getWorklogs({
         startDate: rStartDate,
@@ -119,6 +121,7 @@ export async function runWorklogReports({ forceDate = null, forceType = null } =
         targetType: "custom",
         targetUsers: targetUsersData,
         overrideJql: finalJql,
+        apiToken: activeToken,
         debugLog
       });
 

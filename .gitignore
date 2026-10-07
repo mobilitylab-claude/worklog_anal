@@ -44,4 +44,4 @@ yarn-error.log*
 next-env.d.ts
 jira_filters.db
 backend_daemon.log
-backend_daemon.log
+
